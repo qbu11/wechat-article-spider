@@ -69,16 +69,16 @@ wechat-spider install-skill
 
 ```
 # 搜索相关
-"帮我搜索人民日报这个公众号"
+"帮我搜索极客公园这个公众号"
 "查找一下科技美学最近的发文"
 
 # 爬取文章
-"获取人民日报最近7天的文章"
+"获取极客公园最近7天的文章"
 "帮我爬取虎嗅最近30天的文章，要包含正文内容"
 "抓取36氪最近一周的所有文章，保存到CSV文件"
 
 # 批量操作
-"帮我批量爬取人民日报、新华社、央视新闻这三家最近3天的文章"
+"帮我批量爬取极客公园、爱范儿、机器之心这三家最近3天的文章"
 "获取几个主流科技媒体（极客公园、爱范儿、机器之心）最近的AI相关文章"
 
 # 检查状态
@@ -100,19 +100,19 @@ wechat-spider login
 wechat-spider status
 
 # 3. 搜索公众号
-wechat-spider search "人民日报"
+wechat-spider search "极客公园"
 
 # 4. 爬取文章（标题 + 链接）
-wechat-spider scrape "人民日报" --pages 5 --days 30
+wechat-spider scrape "极客公园" --pages 5 --days 30
 
 # 5. 爬取文章（含正文）
-wechat-spider scrape "人民日报" --pages 5 --days 30 --content
+wechat-spider scrape "极客公园" --pages 5 --days 30 --content
 
 # 6. 保存到 CSV
-wechat-spider scrape "人民日报" --pages 5 --days 30 --content --output result.csv
+wechat-spider scrape "极客公园" --pages 5 --days 30 --content --output result.csv
 
 # 7. 批量爬取
-wechat-spider batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
+wechat-spider batch "极客公园,爱范儿,机器之心" --pages 3 --days 7 --content
 
 # 8. 导出登录凭证（用于无头服务器部署）
 wechat-spider export-login
@@ -177,7 +177,7 @@ wechat-spider status  # 验证登录成功
 {
   "success": true,
   "data": {
-    "account": "人民日报",
+    "account": "极客公园",
     "total": 10,
     "articles": [
       {
@@ -200,8 +200,8 @@ from wechat_article_spider.spider.wechat.scraper import WeChatScraper
 login = WeChatSpiderLogin()
 if login.login():
     scraper = WeChatScraper(login.get_token(), login.get_headers())
-    accounts = scraper.search_account("人民日报")
-    articles = scraper.get_account_articles("人民日报", accounts[0]["wpub_fakid"], max_pages=5)
+    accounts = scraper.search_account("极客公园")
+    articles = scraper.get_account_articles("极客公园", accounts[0]["wpub_fakid"], max_pages=5)
 ```
 
 ## 注意事项
@@ -281,16 +281,16 @@ If you're using this tool in Claude Code / OpenClaw, just describe your needs in
 
 ```
 # Search related
-"Help me search for the People's Daily official account"
+"Help me search for the GeekPark official account"
 "Find recent posts from Tech Aesthetics"
 
 # Scrape articles
-"Get articles from People's Daily from the last 7 days"
+"Get articles from GeekPark from the last 7 days"
 "Help me scrape Huxiu's articles from the last 30 days, including full content"
 "Fetch all articles from 36Kr from the past week and save to CSV"
 
 # Batch operations
-"Help me batch scrape articles from the last 3 days from People's Daily, Xinhua, and CCTV News"
+"Help me batch scrape articles from the last 3 days from GeekPark, iFanr, and Synced"
 "Get recent AI-related articles from mainstream tech media (GeekPark, iFanr, Synced)"
 
 # Status check
@@ -312,19 +312,19 @@ wechat-spider login
 wechat-spider status
 
 # 3. Search for an account
-wechat-spider search "人民日报"
+wechat-spider search "极客公园"
 
 # 4. Scrape articles (titles + links only)
-wechat-spider scrape "人民日报" --pages 5 --days 30
+wechat-spider scrape "极客公园" --pages 5 --days 30
 
 # 5. Scrape with full content
-wechat-spider scrape "人民日报" --pages 5 --days 30 --content
+wechat-spider scrape "极客公园" --pages 5 --days 30 --content
 
 # 6. Save to CSV
-wechat-spider scrape "人民日报" --pages 5 --days 30 --content --output result.csv
+wechat-spider scrape "极客公园" --pages 5 --days 30 --content --output result.csv
 
 # 7. Batch scrape multiple accounts
-wechat-spider batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
+wechat-spider batch "极客公园,爱范儿,机器之心" --pages 3 --days 7 --content
 
 # 8. Export credentials (for headless servers)
 wechat-spider export-login
@@ -389,7 +389,7 @@ All commands output JSON:
 {
   "success": true,
   "data": {
-    "account": "人民日报",
+    "account": "极客公园",
     "total": 10,
     "articles": [
       {
@@ -412,8 +412,8 @@ from wechat_article_spider.spider.wechat.scraper import WeChatScraper
 login = WeChatSpiderLogin()
 if login.login():
     scraper = WeChatScraper(login.get_token(), login.get_headers())
-    accounts = scraper.search_account("人民日报")
-    articles = scraper.get_account_articles("人民日报", accounts[0]["wpub_fakid"], max_pages=5)
+    accounts = scraper.search_account("极客公园")
+    articles = scraper.get_account_articles("极客公园", accounts[0]["wpub_fakid"], max_pages=5)
 ```
 
 ## Notes
