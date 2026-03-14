@@ -2,7 +2,7 @@
 
 ## 场景描述
 
-当用户提供的关键词**不是公众号名称**，而是需要搜索的**文章主题关键词**时，`wechat-search` 工具无法直接使用（它只支持按公众号名搜索）。
+当用户提供的关键词**不是公众号名称**，而是需要搜索的**文章主题关键词**时，`wechat-spider` 工具无法直接使用（它只支持按公众号名搜索）。
 
 此时需要采用**浏览器自动化 + 搜狗微信搜索**的方案来完成任务。
 
@@ -13,8 +13,8 @@
 ### 1. 识别关键词类型
 
 ```bash
-# 先尝试用 wechat-search 搜索公众号名
-wechat-search search "关键词"
+# 先尝试用 wechat-spider 搜索公众号名
+wechat-spider search "关键词"
 
 # 如果返回的公众号列表明显不相关（如包含大量无关账号）
 # 则判断：这是文章关键词，不是公众号名
@@ -198,9 +198,9 @@ with open('output.csv', 'w', encoding='utf-8', newline='') as f:
 
 | 场景 | 推荐工具 | 原因 |
 |------|---------|------|
-| 按公众号名搜索 | `wechat-search` skill | 专门工具，支持登录态，可直接爬取 |
+| 按公众号名搜索 | `wechat-spider` skill | 专门工具，支持登录态，可直接爬取 |
 | 按文章关键词搜索 | Chrome DevTools MCP | 需要解析搜狗搜索页面，提取时间戳 |
-| 批量爬取文章 | `wechat-search batch` | 效率高，支持时间范围过滤 |
+| 批量爬取文章 | `wechat-spider batch` | 效率高，支持时间范围过滤 |
 | 单篇文章抓取 | `navigate_page` + JS提取 | 绕过搜狗跳转，直接获取微信原文 |
 
 ---
@@ -268,7 +268,7 @@ chrome_devtools__evaluate_script({
 ## 相关工具
 
 - `chrome-browser-automation` skill: Chrome DevTools MCP 配置
-- `wechat-search` skill: 公众号搜索与爬取
+- `wechat-spider` skill: 公众号搜索与爬取
 - `union-search-skill`: 跨平台搜索（支持微信文章搜索）
 
 ---

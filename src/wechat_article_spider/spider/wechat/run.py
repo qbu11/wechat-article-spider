@@ -19,14 +19,14 @@
 
 使用示例:
     # 作为模块使用
-    from wechat_search.spider.wechat.run import WeChatSpiderRunner
+    from wechat_article_spider.spider.wechat.run import WeChatSpiderRunner
     
     runner = WeChatSpiderRunner()
     runner.login()
     runner.scrape_single_account('人民日报', pages=5)
     
     # 使用便捷函数
-    from wechat_search.spider.wechat.run import login, scrape_account
+    from wechat_article_spider.spider.wechat.run import login, scrape_account
     
     login()
     scrape_account('人民日报', pages=5, include_content=True)
@@ -38,10 +38,10 @@ import time
 import json
 from datetime import datetime, timedelta
 
-from wechat_search.spider.log.utils import logger
+from wechat_article_spider.spider.log.utils import logger
 from .login import WeChatSpiderLogin, quick_login
 from .scraper import WeChatScraper, BatchWeChatScraper
-from wechat_search.spider.wechat.paths import DEFAULT_OUTPUT_DIR
+from wechat_article_spider.spider.wechat.paths import DEFAULT_OUTPUT_DIR
 
 
 class WeChatSpiderRunner:

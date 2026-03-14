@@ -1,6 +1,6 @@
-# wechat-search-skill
+# wechat-article-spider
 
-微信公众号文章检索 CLI 工具 | WeChat Official Account Article Search & Scrape CLI
+微信公众号文章爬取 CLI 工具 | WeChat Official Account Article Spider CLI
 
 ---
 
@@ -8,7 +8,7 @@
 
 ## 简介
 
-`wechat-search-skill` 是一个自包含的微信公众号文章检索命令行工具。通过微信公众平台 API，支持公众号搜索、文章列表获取、正文内容提取（Markdown 格式），并可集成到 Claude Code / OpenClaw 作为 Skill 使用。
+`wechat-article-spider` 是一个自包含的微信公众号文章爬取命令行工具。通过微信公众平台 API，支持公众号搜索、文章列表获取、正文内容提取（Markdown 格式），并可集成到 Claude Code / OpenClaw 作为 Skill 使用。
 
 ### 功能特性
 
@@ -23,11 +23,11 @@
 
 ```bash
 # 从 GitHub 安装
-pip install git+https://github.com/qbu11/wechat-search-skill.git
+pip install git+https://github.com/qbu11/wechat-article-spider.git
 
 # 或克隆后本地安装
-git clone https://github.com/qbu11/wechat-search-skill.git
-pip install ./wechat-search-skill
+git clone https://github.com/qbu11/wechat-article-spider.git
+pip install ./wechat-article-spider
 ```
 
 ### 环境要求
@@ -38,10 +38,10 @@ pip install ./wechat-search-skill
 ### 部署为 Claude Code Skill（可选）
 
 ```bash
-wechat-search install-skill
+wechat-spider install-skill
 ```
 
-自动将 SKILL.md 部署到 `~/.claude/skills/wechat-search/`，之后在 Claude Code 中可通过 `/wechat-search` 触发。
+自动将 SKILL.md 部署到 `~/.claude/skills/wechat-article-spider/`，之后在 Claude Code 中可通过 `/wechat-article-spider` 触发。
 
 ## 快速开始
 
@@ -52,37 +52,66 @@ wechat-search install-skill
 1. **按公众号名称搜索**：用户知道具体公众号名，使用 CLI 工具直接爬取
 2. **按文章关键词搜索**：用户想跨公众号搜索相关文章，需配合 Chrome DevTools MCP 使用搜狗微信搜索
 
-**自动判断**：先运行 `wechat-search search "关键词"`，如果返回的公众号列表不相关，则切换到搜狗搜索模式。
+**自动判断**：先运行 `wechat-spider search "关键词"`，如果返回的公众号列表不相关，则切换到搜狗搜索模式。
+
+### 自然语言使用指南（推荐）
+
+如果你在 Claude Code / OpenClaw 中使用本工具，直接用自然语言描述你的需求即可，Claude 会自动调用合适的命令。
+
+**示例：**
+
+```
+# 搜索相关
+"帮我搜索人民日报这个公众号"
+"查找一下科技美学最近的发文"
+
+# 爬取文章
+"获取人民日报最近7天的文章"
+"帮我爬取虎嗅最近30天的文章，要包含正文内容"
+"抓取36氪最近一周的所有文章，保存到CSV文件"
+
+# 批量操作
+"帮我批量爬取人民日报、新华社、央视新闻这三家最近3天的文章"
+"获取几个主流科技媒体（极客公园、爱范儿、机器之心）最近的AI相关文章"
+
+# 检查状态
+"检查一下登录状态"
+"我需要重新登录微信"
+```
+
+Claude 会根据你的需求自动选择合适的命令和参数，无需记忆具体的 CLI 语法。
 
 ### CLI 快速上手
 
+如果你直接使用命令行，以下是常用命令：
+
 ```bash
 # 1. 登录（首次使用，需微信扫码）
-wechat-search login
+wechat-spider login
 
 # 2. 检查登录状态
-wechat-search status
+wechat-spider status
 
 # 3. 搜索公众号
-wechat-search search "人民日报"
+wechat-spider search "人民日报"
 
 # 4. 爬取文章（标题 + 链接）
-wechat-search scrape "人民日报" --pages 5 --days 30
+wechat-spider scrape "人民日报" --pages 5 --days 30
 
 # 5. 爬取文章（含正文）
-wechat-search scrape "人民日报" --pages 5 --days 30 --content
+wechat-spider scrape "人民日报" --pages 5 --days 30 --content
 
 # 6. 保存到 CSV
-wechat-search scrape "人民日报" --pages 5 --days 30 --content --output result.csv
+wechat-spider scrape "人民日报" --pages 5 --days 30 --content --output result.csv
 
 # 7. 批量爬取
-wechat-search batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
+wechat-spider batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
 
 # 8. 导出登录凭证（用于无头服务器部署）
-wechat-search export-login
+wechat-spider export-login
 
 # 9. 在无头服务器上导入凭证
-wechat-search import-login "导出的凭证字符串"
+wechat-spider import-login "导出的凭证字符串"
 ```
 
 ### 无头服务器部署
@@ -91,13 +120,13 @@ wechat-search import-login "导出的凭证字符串"
 
 ```bash
 # 在本地机器（有浏览器）
-wechat-search login
-wechat-search export-login
+wechat-spider login
+wechat-spider export-login
 # 复制输出的凭证字符串
 
 # 在无头服务器上
-wechat-search import-login "粘贴凭证字符串"
-wechat-search status  # 验证登录成功
+wechat-spider import-login "粘贴凭证字符串"
+wechat-spider status  # 验证登录成功
 ```
 
 ## 命令参考
@@ -158,8 +187,8 @@ wechat-search status  # 验证登录成功
 ## 作为 Python 库使用
 
 ```python
-from wechat_search.spider.wechat.login import WeChatSpiderLogin
-from wechat_search.spider.wechat.scraper import WeChatScraper
+from wechat_article_spider.spider.wechat.login import WeChatSpiderLogin
+from wechat_article_spider.spider.wechat.scraper import WeChatScraper
 
 login = WeChatSpiderLogin()
 if login.login():
@@ -184,7 +213,7 @@ if login.login():
 
 ## Introduction
 
-`wechat-search-skill` is a self-contained CLI tool for searching and scraping articles from WeChat Official Accounts (微信公众号). It interacts with the WeChat Official Account Platform API to search accounts, fetch article lists, and extract full article content in Markdown format. It also integrates as a Skill for Claude Code / OpenClaw.
+`wechat-article-spider` is a self-contained CLI tool for searching and scraping articles from WeChat Official Accounts (微信公众号). It interacts with the WeChat Official Account Platform API to search accounts, fetch article lists, and extract full article content in Markdown format. It also integrates as a Skill for Claude Code / OpenClaw.
 
 ### Features
 
@@ -199,11 +228,11 @@ if login.login():
 
 ```bash
 # From GitHub
-pip install git+https://github.com/qbu11/wechat-search-skill.git
+pip install git+https://github.com/qbu11/wechat-article-spider.git
 
 # Or clone and install locally
-git clone https://github.com/qbu11/wechat-search-skill.git
-pip install ./wechat-search-skill
+git clone https://github.com/qbu11/wechat-article-spider.git
+pip install ./wechat-article-spider
 ```
 
 ### Requirements
@@ -214,10 +243,10 @@ pip install ./wechat-search-skill
 ### Deploy as Claude Code Skill (optional)
 
 ```bash
-wechat-search install-skill
+wechat-spider install-skill
 ```
 
-This deploys SKILL.md to `~/.claude/skills/wechat-search/`. After that, trigger it in Claude Code via `/wechat-search`.
+This deploys SKILL.md to `~/.claude/skills/wechat-article-spider/`. After that, trigger it in Claude Code via `/wechat-article-spider`.
 
 ## Quick Start
 
@@ -228,37 +257,66 @@ This tool supports two search modes:
 1. **Search by Account Name**: When you know the specific account name, use CLI directly
 2. **Search by Article Keywords**: When you want to search articles across accounts, use Sogou WeChat Search with Chrome DevTools MCP
 
-**Auto-detection**: Run `wechat-search search "keyword"` first. If returned accounts are irrelevant, switch to Sogou search mode.
+**Auto-detection**: Run `wechat-spider search "keyword"` first. If returned accounts are irrelevant, switch to Sogou search mode.
+
+### Natural Language Usage Guide (Recommended)
+
+If you're using this tool in Claude Code / OpenClaw, just describe your needs in natural language. Claude will automatically invoke the appropriate commands.
+
+**Examples:**
+
+```
+# Search related
+"Help me search for the People's Daily official account"
+"Find recent posts from Tech Aesthetics"
+
+# Scrape articles
+"Get articles from People's Daily from the last 7 days"
+"Help me scrape Huxiu's articles from the last 30 days, including full content"
+"Fetch all articles from 36Kr from the past week and save to CSV"
+
+# Batch operations
+"Help me batch scrape articles from the last 3 days from People's Daily, Xinhua, and CCTV News"
+"Get recent AI-related articles from mainstream tech media (GeekPark, iFanr, Synced)"
+
+# Status check
+"Check my login status"
+"I need to re-login to WeChat"
+```
+
+Claude will automatically select the appropriate commands and parameters based on your needs—no need to memorize CLI syntax.
 
 ### CLI Quick Start
 
+If you're using the command line directly, here are the common commands:
+
 ```bash
 # 1. Login (first time, requires WeChat QR scan)
-wechat-search login
+wechat-spider login
 
 # 2. Check login status
-wechat-search status
+wechat-spider status
 
 # 3. Search for an account
-wechat-search search "人民日报"
+wechat-spider search "人民日报"
 
 # 4. Scrape articles (titles + links only)
-wechat-search scrape "人民日报" --pages 5 --days 30
+wechat-spider scrape "人民日报" --pages 5 --days 30
 
 # 5. Scrape with full content
-wechat-search scrape "人民日报" --pages 5 --days 30 --content
+wechat-spider scrape "人民日报" --pages 5 --days 30 --content
 
 # 6. Save to CSV
-wechat-search scrape "人民日报" --pages 5 --days 30 --content --output result.csv
+wechat-spider scrape "人民日报" --pages 5 --days 30 --content --output result.csv
 
 # 7. Batch scrape multiple accounts
-wechat-search batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
+wechat-spider batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
 
 # 8. Export credentials (for headless servers)
-wechat-search export-login
+wechat-spider export-login
 
 # 9. Import credentials on headless server
-wechat-search import-login "exported-credential-string"
+wechat-spider import-login "exported-credential-string"
 ```
 
 ### Headless Server Deployment
@@ -267,13 +325,13 @@ For servers without a browser, export credentials from a local machine first:
 
 ```bash
 # On local machine (with browser)
-wechat-search login
-wechat-search export-login
+wechat-spider login
+wechat-spider export-login
 # Copy the credential string
 
 # On headless server
-wechat-search import-login "paste-credential-string"
-wechat-search status  # Verify login success
+wechat-spider import-login "paste-credential-string"
+wechat-spider status  # Verify login success
 ```
 
 ## Command Reference
@@ -334,8 +392,8 @@ All commands output JSON:
 ## Use as Python Library
 
 ```python
-from wechat_search.spider.wechat.login import WeChatSpiderLogin
-from wechat_search.spider.wechat.scraper import WeChatScraper
+from wechat_article_spider.spider.wechat.login import WeChatSpiderLogin
+from wechat_article_spider.spider.wechat.scraper import WeChatScraper
 
 login = WeChatSpiderLogin()
 if login.login():

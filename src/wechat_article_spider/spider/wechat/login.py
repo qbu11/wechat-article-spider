@@ -47,8 +47,8 @@ from datetime import datetime, timedelta
 from DrissionPage import ChromiumPage, ChromiumOptions
 import requests
 
-from wechat_search.spider.log.utils import logger
-from wechat_search.spider.wechat.paths import get_wechat_cache_file
+from wechat_article_spider.spider.log.utils import logger
+from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
 
 # 缓存文件路径（存储在用户数据目录）
 CACHE_FILE = get_wechat_cache_file()

@@ -19,7 +19,7 @@ from tqdm import tqdm
 import bs4
 from markdownify import MarkdownConverter
 
-from wechat_search.spider.log.utils import logger
+from wechat_article_spider.spider.log.utils import logger
 
 
 class ImageBlockConverter(MarkdownConverter):

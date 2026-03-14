@@ -1,4 +1,4 @@
-# 微信公众号检索工具 - 详细用法
+# 微信公众号文章爬取工具 - 详细用法
 
 ## 安装
 
@@ -6,30 +6,30 @@
 
 ```bash
 # 从本地目录安装
-pip install ./wechat-search-skill
+pip install ./wechat-article-spider
 
 # 开发模式安装（代码修改立即生效）
-pip install -e ./wechat-search-skill
+pip install -e ./wechat-article-spider
 ```
 
 ### 方式二：从 Git 仓库安装
 
 ```bash
-pip install git+https://github.com/user/wechat-search-skill.git
+pip install git+https://github.com/qbu11/wechat-article-spider.git
 ```
 
 ## 环境要求
 
 - Python >= 3.8
 - Chrome 浏览器（登录时需要）
-- 依赖包：requests, loguru, beautifulsoup4, lxml, markdownify, tqdm, selenium, aiohttp
+- 依赖包：requests, loguru, beautifulsoup4, lxml, markdownify, tqdm, DrissionPage, aiohttp
 
 ## 登录流程
 
 ### 首次使用
 
 ```bash
-wechat-search login
+wechat-spider login
 ```
 
 1. 系统会自动打开 Chrome 浏览器
@@ -41,7 +41,7 @@ wechat-search login
 ### 检查登录状态
 
 ```bash
-wechat-search status
+wechat-spider status
 ```
 
 返回示例：
@@ -63,7 +63,7 @@ wechat-search status
 ## 搜索公众号
 
 ```bash
-wechat-search search "人民日报"
+wechat-spider search "人民日报"
 ```
 
 返回示例：
@@ -87,7 +87,7 @@ wechat-search search "人民日报"
 ### 基础爬取
 
 ```bash
-wechat-search scrape "人民日报" --pages 5 --days 30
+wechat-spider scrape "人民日报" --pages 5 --days 30
 ```
 
 - 获取最近 30 天的文章
@@ -97,7 +97,7 @@ wechat-search scrape "人民日报" --pages 5 --days 30
 ### 获取正文
 
 ```bash
-wechat-search scrape "人民日报" --pages 5 --days 30 --content
+wechat-spider scrape "人民日报" --pages 5 --days 30 --content
 ```
 
 正文为 Markdown 格式。
@@ -105,7 +105,7 @@ wechat-search scrape "人民日报" --pages 5 --days 30 --content
 ### 保存到文件
 
 ```bash
-wechat-search scrape "人民日报" --pages 5 --days 30 --content --output result.csv
+wechat-spider scrape "人民日报" --pages 5 --days 30 --content --output result.csv
 ```
 
 CSV 格式包含：公众号、标题、发布时间、链接、内容
@@ -113,7 +113,7 @@ CSV 格式包含：公众号、标题、发布时间、链接、内容
 ## 批量爬取
 
 ```bash
-wechat-search batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
+wechat-spider batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
 ```
 
 - 公众号名称用逗号、分号或空格分隔
@@ -122,7 +122,7 @@ wechat-search batch "人民日报,新华社,CCTV" --pages 3 --days 7 --content
 ### 指定输出目录
 
 ```bash
-wechat-search batch "人民日报,新华社" --pages 3 --days 7 --output-dir ./results
+wechat-spider batch "人民日报,新华社" --pages 3 --days 7 --output-dir ./results
 ```
 
 ## 请求频率
@@ -137,8 +137,8 @@ wechat-search batch "人民日报,新华社" --pages 3 --days 7 --output-dir ./r
 ## 作为 Python 库使用
 
 ```python
-from wechat_search.spider.wechat.login import WeChatSpiderLogin
-from wechat_search.spider.wechat.scraper import WeChatScraper, BatchWeChatScraper
+from wechat_article_spider.spider.wechat.login import WeChatSpiderLogin
+from wechat_article_spider.spider.wechat.scraper import WeChatScraper, BatchWeChatScraper
 
 # 登录
 login = WeChatSpiderLogin()

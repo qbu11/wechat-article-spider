@@ -39,10 +39,10 @@ from typing import Dict, Any, Tuple, Optional
 from datetime import datetime
 
 # 导入日志模块
-from wechat_search.spider.log.utils import logger
+from wechat_article_spider.spider.log.utils import logger
 
 # 导入路径工具函数
-from wechat_search.spider.wechat.paths import get_wechat_cache_file
+from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
 
 # ============================================================================
 # 常量定义

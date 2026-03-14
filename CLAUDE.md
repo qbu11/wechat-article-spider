@@ -1,16 +1,15 @@
-# wechat-search-skill
+# wechat-article-spider
 
-微信公众号文章搜索与爬取工具。pip 可安装，CLI 驱动，支持 Claude Code / OpenClaw Skill 集成。
+微信公众号文章爬取工具。pip 可安装，CLI 驱动，支持 Claude Code / OpenClaw Skill 集成。
 
 ## 项目结构
 
 ```
-wechat-search-skill/
+wechat-article-spider/
 ├── CLAUDE.md                          # 本文件
-├── pyproject.toml                     # 包定义，入口 wechat-search
+├── pyproject.toml                     # 包定义，入口 wechat-spider
 ├── VERSIONS.md                        # 多版本管理（DrissionPage / agent-browser / Selenium）
-├── wechat-article-search-workflow.md  # 场景 B 搜狗搜索工作流参考文档
-├── src/wechat_search/
+├── src/wechat_article_spider/
 │   ├── cli.py                         # CLI 入口，所有子命令定义
 │   ├── skill_data/SKILL.md            # Skill 文档（随 pip 包分发）
 │   └── spider/
@@ -31,7 +30,7 @@ wechat-search-skill/
 |------|-----------|------|
 | `master` | DrissionPage（纯 Python，推荐） | 活跃 |
 | `agent-browser-version` | agent-browser（Vercel，Node.js） | 备选 |
-| 本地备份 `wechat-search-skill-selenium-backup/` | Selenium | 归档 |
+| 本地备份 `wechat-article-spider-selenium-backup/` | Selenium | 归档 |
 
 ## 开发约定
 
@@ -45,21 +44,21 @@ wechat-search-skill/
 ## CLI 命令
 
 ```bash
-wechat-search status                    # 检查登录状态
-wechat-search login                     # 扫码登录（弹出 Chrome）
-wechat-search search "关键词"            # 搜索公众号
-wechat-search scrape "公众号" --pages 5 --days 30 --content --output result.csv
-wechat-search batch "号1,号2" --pages 3 --days 7 --content --output-dir ./out
-wechat-search export-login              # 导出凭证字符串
-wechat-search import-login "凭证字符串"  # 导入凭证
-wechat-search install-skill             # 部署 SKILL.md 到 ~/.claude/skills/
+wechat-spider status                    # 检查登录状态
+wechat-spider login                     # 扫码登录（弹出 Chrome）
+wechat-spider search "关键词"            # 搜索公众号
+wechat-spider scrape "公众号" --pages 5 --days 30 --content --output result.csv
+wechat-spider batch "号1,号2" --pages 3 --days 7 --content --output-dir ./out
+wechat-spider export-login              # 导出凭证字符串
+wechat-spider import-login "凭证字符串"  # 导入凭证
+wechat-spider install-skill             # 部署 SKILL.md 到 ~/.claude/skills/
 ```
 
 ## 两种搜索模式
 
 ### 场景 A：按公众号名称（CLI 工具）
 
-`wechat-search search/scrape/batch`，依赖微信公众平台 API + 登录态。
+`wechat-spider search/scrape/batch`，依赖微信公众平台 API + 登录态。
 
 ### 场景 B：按文章关键词（Chrome DevTools MCP + 搜狗）
 
@@ -77,22 +76,22 @@ wechat-search install-skill             # 部署 SKILL.md 到 ~/.claude/skills/
 # 安装
 pip install .
 # 或从 GitHub
-pip install git+https://github.com/qbu11/wechat-search-skill.git
+pip install git+https://github.com/qbu11/wechat-article-spider.git
 
 # 部署 Skill
-wechat-search install-skill
-# → ~/.claude/skills/wechat-search/SKILL.md
-# → ~/.openclaw/skills/wechat-search/SKILL.md
+wechat-spider install-skill
+# → ~/.claude/skills/wechat-article-spider/SKILL.md
+# → ~/.openclaw/skills/wechat-article-spider/SKILL.md
 ```
 
 ## 测试
 
 ```bash
-wechat-search status                                          # 登录态
-wechat-search search "人民日报"                                # 搜索
-wechat-search scrape "人民日报" --pages 2 --days 7             # 爬取标题
-wechat-search scrape "人民日报" --pages 2 --days 7 --content   # 爬取正文
-wechat-search export-login                                     # 导出凭证
+wechat-spider status                                          # 登录态
+wechat-spider search "人民日报"                                # 搜索
+wechat-spider scrape "人民日报" --pages 2 --days 7             # 爬取标题
+wechat-spider scrape "人民日报" --pages 2 --days 7 --content   # 爬取正文
+wechat-spider export-login                                     # 导出凭证
 ```
 
 ## 已知问题

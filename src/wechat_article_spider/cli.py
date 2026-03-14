@@ -14,10 +14,10 @@
     batch    - 批量爬取多个公众号
 
 用法:
-    wechat-search status
-    wechat-search search "人民日报"
-    wechat-search scrape "人民日报" --pages 5 --days 30
-    wechat-search batch "人民日报,新华社" --pages 3 --days 7
+    wechat-spider status
+    wechat-spider search "人民日报"
+    wechat-spider scrape "人民日报" --pages 5 --days 30
+    wechat-spider batch "人民日报,新华社" --pages 3 --days 7
 """
 
 import argparse
@@ -61,10 +61,10 @@ def _print_json(data):
 
 # 延迟导入，避免在 --help 时触发 loguru 初始化
 def _lazy_imports():
-    from wechat_search.spider.log.utils import logger
-    from wechat_search.spider.wechat.login import WeChatSpiderLogin
-    from wechat_search.spider.wechat.scraper import WeChatScraper, BatchWeChatScraper
-    from wechat_search.spider.wechat.paths import get_default_output_dir, get_wechat_cache_file
+    from wechat_article_spider.spider.log.utils import logger
+    from wechat_article_spider.spider.wechat.login import WeChatSpiderLogin
+    from wechat_article_spider.spider.wechat.scraper import WeChatScraper, BatchWeChatScraper
+    from wechat_article_spider.spider.wechat.paths import get_default_output_dir, get_wechat_cache_file
     return logger, WeChatSpiderLogin, WeChatScraper, BatchWeChatScraper, get_default_output_dir, get_wechat_cache_file
 
 
@@ -119,7 +119,7 @@ def _ensure_login():
         print("登录成功！继续执行...", file=sys.stderr)
         return login_mgr, True
 
-    _print_json({"success": False, "error": "登录失败，请手动执行 wechat-search login"})
+    _print_json({"success": False, "error": "登录失败，请手动执行 wechat-article-spider login"})
     return login_mgr, False
 
 
@@ -308,7 +308,7 @@ def cmd_install_skill(args):
     home = Path.home()
     targets = []
 
-    claude_dir = home / ".claude" / "skills" / "wechat-search"
+    claude_dir = home / ".claude" / "skills" / "wechat-article-spider"
     claude_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(skill_src, claude_dir / "SKILL.md")
     targets.append(str(claude_dir / "SKILL.md"))
@@ -320,7 +320,7 @@ def cmd_install_skill(args):
             shutil.rmtree(ref_dst)
         shutil.copytree(ref_src, ref_dst)
 
-    openclaw_dir = home / ".openclaw" / "skills" / "wechat-search"
+    openclaw_dir = home / ".openclaw" / "skills" / "wechat-article-spider"
     try:
         openclaw_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(skill_src, openclaw_dir / "SKILL.md")
@@ -328,7 +328,7 @@ def cmd_install_skill(args):
     except Exception:
         pass
 
-    old_cmd = home / ".claude" / "commands" / "wechat-search.md"
+    old_cmd = home / ".claude" / "commands" / "wechat-article-spider.md"
     if old_cmd.exists():
         old_cmd.unlink()
         targets.append(f"removed: {old_cmd}")
@@ -345,12 +345,12 @@ def cmd_install_skill(args):
 
 def cmd_export_login(args):
     """导出登录凭证为可分享字符串"""
-    from wechat_search.spider.wechat.cache_codec import encode_cache_file
-    from wechat_search.spider.wechat.paths import get_wechat_cache_file
+    from wechat_article_spider.spider.wechat.cache_codec import encode_cache_file
+    from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
 
     cache_file = get_wechat_cache_file()
     if not os.path.exists(cache_file):
-        _print_json({"success": False, "error": "未找到登录缓存，请先执行 wechat-search login"})
+        _print_json({"success": False, "error": "未找到登录缓存，请先执行 wechat-article-spider login"})
         return 1
 
     try:
@@ -370,8 +370,8 @@ def cmd_export_login(args):
 
 def cmd_import_login(args):
     """从编码字符串导入登录凭证"""
-    from wechat_search.spider.wechat.cache_codec import decode_to_cache_file
-    from wechat_search.spider.wechat.paths import get_wechat_cache_file
+    from wechat_article_spider.spider.wechat.cache_codec import decode_to_cache_file
+    from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
 
     encoded_str = args.token_string
     if not encoded_str:

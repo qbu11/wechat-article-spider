@@ -1,19 +1,19 @@
-# 微信公众号检索
+# 微信公众号文章爬取
 
 微信公众号文章搜索与爬取工具。支持两种搜索模式：按公众号名称搜索和按文章关键词搜索。
 
 ## 触发词
 
-wechat-search, 微信公众号搜索, 公众号检索, 微信文章搜索
+wechat-article-spider, wechat-spider, 微信公众号搜索, 公众号检索, 微信文章搜索, 微信文章爬取
 
 ## 安装
 
 ```bash
 # 从本地目录安装
-pip install ./wechat-search-skill
+pip install ./wechat-article-spider
 
 # 或从 Git 仓库安装
-pip install git+https://github.com/qbu11/wechat-search-skill.git
+pip install git+https://github.com/qbu11/wechat-article-spider.git
 ```
 
 ## 前置条件
@@ -30,7 +30,7 @@ pip install git+https://github.com/qbu11/wechat-search-skill.git
 
 ```bash
 # 先尝试搜索公众号
-wechat-search search "用户输入的关键词"
+wechat-spider search "用户输入的关键词"
 ```
 
 **判断依据：**
@@ -41,12 +41,12 @@ wechat-search search "用户输入的关键词"
 
 ## 场景 A：按公众号名称搜索
 
-用户知道具体公众号名称，想获取该公众号的文章。使用 `wechat-search` CLI 工具。
+用户知道具体公众号名称，想获取该公众号的文章。使用 `wechat-spider` CLI 工具。
 
 ### 1. 检查登录状态
 
 ```bash
-wechat-search status
+wechat-spider status
 ```
 
 返回 JSON 格式的登录状态。如果 `success: false`，需要先登录。
@@ -54,7 +54,7 @@ wechat-search status
 ### 2. 登录（需要用户扫码）
 
 ```bash
-wechat-search login
+wechat-spider login
 ```
 
 会弹出 Chrome 浏览器窗口，用户需要用微信扫码。登录成功后凭证自动缓存。
@@ -64,7 +64,7 @@ wechat-search login
 ### 3. 搜索公众号
 
 ```bash
-wechat-search search "公众号名称"
+wechat-spider search "公众号名称"
 ```
 
 返回匹配的公众号列表，包含 `wpub_name`（名称）和 `wpub_fakid`（ID）。
@@ -72,7 +72,7 @@ wechat-search search "公众号名称"
 ### 4. 爬取单个公众号文章
 
 ```bash
-wechat-search scrape "公众号名称" --pages 5 --days 30 --content
+wechat-spider scrape "公众号名称" --pages 5 --days 30 --content
 ```
 
 参数说明:
@@ -85,7 +85,7 @@ wechat-search scrape "公众号名称" --pages 5 --days 30 --content
 ### 5. 批量爬取多个公众号
 
 ```bash
-wechat-search batch "公众号1,公众号2,公众号3" --pages 3 --days 7 --content
+wechat-spider batch "公众号1,公众号2,公众号3" --pages 3 --days 7 --content
 ```
 
 参数说明:
@@ -99,10 +99,10 @@ wechat-search batch "公众号1,公众号2,公众号3" --pages 3 --days 7 --cont
 
 ```bash
 # 在有浏览器的机器上导出凭证
-wechat-search export-login
+wechat-spider export-login
 
 # 在无头服务器上导入凭证
-wechat-search import-login "导出的凭证字符串"
+wechat-spider import-login "导出的凭证字符串"
 ```
 
 ---
@@ -265,9 +265,9 @@ with open('output.csv', 'w', encoding='utf-8', newline='') as f:
 
 | 场景 | 推荐工具 | 原因 |
 |------|---------|------|
-| 按公众号名搜索 | `wechat-search` CLI | 专门工具，支持登录态，可直接爬取 |
+| 按公众号名搜索 | `wechat-spider` CLI | 专门工具，支持登录态，可直接爬取 |
 | 按文章关键词搜索 | Chrome DevTools MCP | 需要解析搜狗搜索页面，提取时间戳 |
-| 批量爬取文章 | `wechat-search batch` | 效率高，支持时间范围过滤 |
+| 批量爬取文章 | `wechat-spider batch` | 效率高，支持时间范围过滤 |
 | 单篇文章抓取 | Chrome DevTools + JS 提取 | 绕过搜狗跳转，直接获取微信原文 |
 | 无头服务器部署 | `export-login` / `import-login` | 无需扫码，凭证可移植 |
 
@@ -291,19 +291,19 @@ with open('output.csv', 'w', encoding='utf-8', newline='') as f:
 ### 场景A: 快速查看某公众号最近文章标题
 
 ```bash
-wechat-search scrape "人民日报" --pages 2 --days 7
+wechat-spider scrape "人民日报" --pages 2 --days 7
 ```
 
 ### 场景B: 获取某公众号文章全文用于分析
 
 ```bash
-wechat-search scrape "某公众号" --pages 10 --days 90 --content --output results.csv
+wechat-spider scrape "某公众号" --pages 10 --days 90 --content --output results.csv
 ```
 
 ### 场景C: 对比多个公众号的内容
 
 ```bash
-wechat-search batch "公众号A,公众号B,公众号C" --pages 5 --days 30 --content
+wechat-spider batch "公众号A,公众号B,公众号C" --pages 5 --days 30 --content
 ```
 
 ### 场景D: 按关键词搜索文章（跨公众号）

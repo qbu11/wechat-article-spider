@@ -1,19 +1,19 @@
-# 微信公众号检索
+# 微信公众号文章爬取
 
 微信公众号文章搜索与爬取工具。通过微信公众平台 API 检索公众号和文章。
 
 ## 触发词
 
-wechat-search, 微信公众号搜索, 公众号检索, 微信文章搜索
+wechat-article-spider, wechat-spider, 微信公众号搜索, 公众号检索, 微信文章搜索, 微信文章爬取
 
 ## 安装
 
 ```bash
 # 从本地目录安装
-pip install ./wechat-search-skill
+pip install ./wechat-article-spider
 
 # 或从 Git 仓库安装
-pip install git+https://github.com/user/wechat-search-skill.git
+pip install git+https://github.com/qbu11/wechat-article-spider.git
 ```
 
 ## 前置条件
@@ -27,7 +27,7 @@ pip install git+https://github.com/user/wechat-search-skill.git
 ### 1. 检查登录状态
 
 ```bash
-wechat-search status
+wechat-spider status
 ```
 
 返回 JSON 格式的登录状态。如果 `success: false`，需要先登录。
@@ -35,7 +35,7 @@ wechat-search status
 ### 2. 登录（需要用户扫码）
 
 ```bash
-wechat-search login
+wechat-spider login
 ```
 
 会弹出 Chrome 浏览器窗口，用户需要用微信扫码。登录成功后凭证自动缓存。
@@ -45,7 +45,7 @@ wechat-search login
 ### 3. 搜索公众号
 
 ```bash
-wechat-search search "公众号名称"
+wechat-spider search "公众号名称"
 ```
 
 返回匹配的公众号列表，包含 `wpub_name`（名称）和 `wpub_fakid`（ID）。
@@ -53,7 +53,7 @@ wechat-search search "公众号名称"
 ### 4. 爬取单个公众号文章
 
 ```bash
-wechat-search scrape "公众号名称" --pages 5 --days 30 --content
+wechat-spider scrape "公众号名称" --pages 5 --days 30 --content
 ```
 
 参数说明:
@@ -66,7 +66,7 @@ wechat-search scrape "公众号名称" --pages 5 --days 30 --content
 ### 5. 批量爬取多个公众号
 
 ```bash
-wechat-search batch "公众号1,公众号2,公众号3" --pages 3 --days 7 --content
+wechat-spider batch "公众号1,公众号2,公众号3" --pages 3 --days 7 --content
 ```
 
 参数说明:
@@ -109,17 +109,17 @@ wechat-search batch "公众号1,公众号2,公众号3" --pages 3 --days 7 --cont
 ### 场景A: 快速查看某公众号最近文章标题
 
 ```bash
-wechat-search scrape "人民日报" --pages 2 --days 7
+wechat-spider scrape "人民日报" --pages 2 --days 7
 ```
 
 ### 场景B: 获取某公众号文章全文用于分析
 
 ```bash
-wechat-search scrape "某公众号" --pages 10 --days 90 --content --output results.csv
+wechat-spider scrape "某公众号" --pages 10 --days 90 --content --output results.csv
 ```
 
 ### 场景C: 对比多个公众号的内容
 
 ```bash
-wechat-search batch "公众号A,公众号B,公众号C" --pages 5 --days 30 --content
+wechat-spider batch "公众号A,公众号B,公众号C" --pages 5 --days 30 --content
 ```

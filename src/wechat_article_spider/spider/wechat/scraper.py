@@ -41,8 +41,8 @@ from datetime import datetime, date, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional, Callable
 
-from wechat_search.spider.log.utils import logger
-from wechat_search.spider.wechat.utils import get_fakid, get_articles_list, get_article_content, format_time
+from wechat_article_spider.spider.log.utils import logger
+from wechat_article_spider.spider.wechat.utils import get_fakid, get_articles_list, get_article_content, format_time
 
 
 class WeChatScraper:
@@ -655,7 +655,7 @@ class BatchWeChatScraper:
     
     def _get_articles_with_progress(self, account_name, fakeid, max_pages, config):
         """获取文章列表并实时更新进度"""
-        from wechat_search.spider.wechat.utils import get_articles_list, format_time
+        from wechat_article_spider.spider.wechat.utils import get_articles_list, format_time
         
         all_articles = []
         page_start = 0
@@ -865,7 +865,7 @@ class AsyncBatchWeChatScraper:
         
         # 导入异步模块
         try:
-            from wechat_search.spider.wechat.async_utils import AsyncWeChatClient, format_time as async_format_time
+            from wechat_article_spider.spider.wechat.async_utils import AsyncWeChatClient, format_time as async_format_time
         except ImportError as e:
             logger.error(f"无法导入异步模块: {e}")
             logger.info("回退到同步模式...")
@@ -912,7 +912,7 @@ class AsyncBatchWeChatScraper:
         Returns:
             list: 所有文章列表
         """
-        from wechat_search.spider.wechat.async_utils import AsyncWeChatClient, format_time as async_format_time
+        from wechat_article_spider.spider.wechat.async_utils import AsyncWeChatClient, format_time as async_format_time
         
         accounts = config['accounts']
         token = config['token']

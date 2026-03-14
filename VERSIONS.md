@@ -1,4 +1,4 @@
-# wechat-search-skill 版本管理
+# wechat-article-spider 版本管理
 
 本项目支持多种浏览器自动化方案，通过 Git 分支管理不同版本。
 
@@ -12,7 +12,7 @@
 ## 切换版本
 
 ```bash
-cd /c/11projects/WeMediaSpider/wechat-search-skill
+cd /c/11projects/wechat-article/wechat-article-spider
 
 # 切换到 DrissionPage 版本（推荐）
 git checkout master
@@ -44,9 +44,9 @@ pip install -e .
 
 **使用：**
 ```bash
-wechat-search status   # 检查登录状态
-wechat-search login    # 扫码登录
-wechat-search scrape "人民日报" --pages 5
+wechat-spider status   # 检查登录状态
+wechat-spider login    # 扫码登录
+wechat-spider scrape "人民日报" --pages 5
 ```
 
 **技术细节：**
@@ -86,9 +86,9 @@ pip install -e .
 
 **使用：**
 ```bash
-wechat-search status   # 检查登录状态
-wechat-search login    # 扫码登录
-wechat-search scrape "人民日报" --pages 5
+wechat-spider status   # 检查登录状态
+wechat-spider login    # 扫码登录
+wechat-spider scrape "人民日报" --pages 5
 ```
 
 **技术细节：**
@@ -116,7 +116,7 @@ agent-browser --cdp 9222 cookies get
               │                           │
               ▼                           ▼
 ┌─────────────────────────┐   ┌─────────────────────────────┐
-│  wechat-search-skill    │   │  Chrome DevTools MCP        │
+│  wechat-article-spider  │   │  Chrome DevTools MCP        │
 │  (DrissionPage 或       │   │  (chrome-devtools-mcp)      │
 │   agent-browser)        │   │                             │
 └─────────────────────────┘   └─────────────────────────────┘
@@ -154,15 +154,15 @@ Start-Process "chrome.exe" -ArgumentList "--remote-debugging-port=9222"
 
 原始 Selenium 版本已备份在：
 ```
-C:\11projects\WeMediaSpider\wechat-search-skill-selenium-backup\
+C:\11projects\WeMediaSpider\wechat-article-spider-selenium-backup\
 ```
 
 回滚到 Selenium 版本：
 ```bash
 cd /c/11projects/WeMediaSpider
-rm -rf wechat-search-skill
-cp -r wechat-search-skill-selenium-backup wechat-search-skill
-cd wechat-search-skill
+rm -rf wechat-article-spider
+cp -r wechat-article-spider-selenium-backup wechat-article-spider
+cd wechat-article-spider
 pip install -e .
 ```
 
@@ -199,6 +199,7 @@ pip install -e .
 
 ## 更新日志
 
+- **2026-03-14**: 重命名为 wechat-article-spider
 - **2026-03-13**: 创建 agent-browser 版本
 - **2026-03-13**: 将 Selenium 替换为 DrissionPage
 - **2026-03-12**: 初始版本（Selenium）

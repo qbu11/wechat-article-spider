@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wechat-search-skill"
+name = "wechat-article-spider"
 version = "1.0.0"
-description = "微信公众号文章检索 CLI 工具"
+description = "微信公众号文章爬取 CLI 工具"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [project.scripts]
-wechat-search = "wechat_search.cli:main"
+wechat-spider = "wechat_article_spider.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest", "black", "mypy"]
@@ -30,4 +30,4 @@ dev = ["pytest", "black", "mypy"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-wechat_search = ["skill_data/**/*"]
+wechat_article_spider = ["skill_data/**/*"]
