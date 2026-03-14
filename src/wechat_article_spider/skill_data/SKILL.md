@@ -291,7 +291,7 @@ with open('output.csv', 'w', encoding='utf-8', newline='') as f:
 ### 场景A: 快速查看某公众号最近文章标题
 
 ```bash
-wechat-spider scrape "人民日报" --pages 2 --days 7
+wechat-spider scrape "极客公园" --pages 2 --days 7
 ```
 
 ### 场景B: 获取某公众号文章全文用于分析
