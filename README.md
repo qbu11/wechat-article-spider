@@ -35,13 +35,20 @@ pip install ./wechat-article-spider
 - Python >= 3.8
 - Chrome 浏览器（登录时需要）
 
-### 部署为 Claude Code Skill（可选）
+### 部署为 Claude Code / OpenClaw Skill（可选）
 
 ```bash
 wechat-spider install-skill
 ```
 
-自动将 SKILL.md 部署到 `~/.claude/skills/wechat-article-spider/`，之后在 Claude Code 中可通过 `/wechat-article-spider` 触发。
+自动将 SKILL.md 部署到以下路径：
+
+| 平台 | 部署路径 |
+|------|----------|
+| Claude Code | `~/.claude/skills/wechat-article-spider/SKILL.md` |
+| OpenClaw | `~/.openclaw/skills/wechat-article-spider/SKILL.md` |
+
+部署后可通过 `/wechat-article-spider` 触发。
 
 ## 快速开始
 
@@ -240,13 +247,20 @@ pip install ./wechat-article-spider
 - Python >= 3.8
 - Chrome browser (required for login)
 
-### Deploy as Claude Code Skill (optional)
+### Deploy as Claude Code / OpenClaw Skill (optional)
 
 ```bash
 wechat-spider install-skill
 ```
 
-This deploys SKILL.md to `~/.claude/skills/wechat-article-spider/`. After that, trigger it in Claude Code via `/wechat-article-spider`.
+This deploys SKILL.md to the following paths:
+
+| Platform | Deployment Path |
+|----------|-----------------|
+| Claude Code | `~/.claude/skills/wechat-article-spider/SKILL.md` |
+| OpenClaw | `~/.openclaw/skills/wechat-article-spider/SKILL.md` |
+
+After deployment, trigger it via `/wechat-article-spider`.
 
 ## Quick Start
 
