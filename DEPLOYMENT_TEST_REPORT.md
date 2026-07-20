@@ -50,7 +50,7 @@ wechat-spider scrape "新华社" --pages 1 --days 3 --output test_output/opencla
 
 **结果**:
 - ✅ 凭证导入成功
-- ✅ 登录状态验证通过 (Token: 523027751)
+- ✅ 登录状态验证通过（token 已确认存在，值不输出）
 - ✅ 爬取成功
 - ✅ 输出文件：`docker_test_result.csv` (27,178 字节, 366 行)
 

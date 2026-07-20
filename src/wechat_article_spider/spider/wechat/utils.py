@@ -62,6 +62,12 @@ def get_fakid(headers, tok, query):
     r = requests.get(url, headers=headers, params=data)
     dic = r.json()
 
+    if not isinstance(dic.get('list'), list):
+        base = dic.get('base_resp') or {}
+        message = base.get('err_msg') or base.get('errmsg') or 'unknown'
+        logger.warning(f"公众号搜索接口未返回列表: ret={base.get('ret')}, message={message}")
+        return []
+
     wpub_list = [
         {
             'wpub_name': item['nickname'],

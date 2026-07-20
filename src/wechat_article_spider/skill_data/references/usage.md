@@ -54,7 +54,7 @@ wechat-spider status
     "expireTime": "2026-03-16 10:00:00",
     "hoursSinceLogin": 2.5,
     "hoursUntilExpire": 93.5,
-    "token": "123456789",
+    "tokenPresent": true,
     "message": "已登录 2.5 小时"
   }
 }
