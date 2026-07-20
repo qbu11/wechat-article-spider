@@ -11,3 +11,5 @@ build/
 venv/
 *.whl
 result.csv
+test_output/
+test_headless/*.csv

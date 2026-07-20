@@ -43,6 +43,7 @@ import shutil
 import subprocess
 import re
 from datetime import datetime, timedelta
+from urllib.parse import parse_qs, urlparse
 
 from DrissionPage import ChromiumPage, ChromiumOptions
 import requests
@@ -58,6 +59,32 @@ CACHE_EXPIRE_HOURS = 24 * 4
 
 # Chrome 调试端口（与 Chrome DevTools MCP 共享）
 CHROME_DEBUG_PORT = 9222
+
+
+def cookies_to_dict(raw_cookies):
+    """Normalize DrissionPage cookie containers across API versions."""
+    if isinstance(raw_cookies, dict):
+        return raw_cookies
+    normalized = {}
+    for cookie in raw_cookies or []:
+        if not isinstance(cookie, dict):
+            continue
+        name = cookie.get('name')
+        if name:
+            normalized[name] = cookie.get('value', '')
+    return normalized
+
+
+def authenticated_home_url(url):
+    """Recognize a logged-in WeChat backend page without exposing its token."""
+    parsed = urlparse(url)
+    token = parse_qs(parsed.query).get('token', [])
+    return (
+        parsed.scheme == 'https'
+        and parsed.hostname == 'mp.weixin.qq.com'
+        and bool(token and token[0])
+        and 'loginpage' not in parsed.path
+    )
 
 
 class WeChatSpiderLogin:
@@ -168,7 +195,7 @@ class WeChatSpiderLogin:
                 'f': 'json',
                 'ajax': '1',
                 'random': random.random(),
-                'query': 'test',
+                'query': '量子位',
                 'begin': '0',
                 'count': '1',
             }
@@ -190,6 +217,22 @@ class WeChatSpiderLogin:
                     return True
                 elif result['base_resp']['ret'] in (-6, 200013):
                     logger.warning("缓存的token已失效")
+                    return False
+                elif result['base_resp']['ret'] == 200002:
+                    # Some mini-program backend accounts no longer allow the
+                    # legacy searchbiz probe. Validate the authenticated home
+                    # page so a healthy cache does not trigger another scan.
+                    home = requests.get(
+                        'https://mp.weixin.qq.com/wxamp/home/guide',
+                        cookies=self.cookies,
+                        headers=headers,
+                        params={'token': self.token, 'lang': 'zh_CN'},
+                        timeout=10,
+                    )
+                    if home.status_code == 200 and authenticated_home_url(home.url):
+                        logger.success("缓存登录态有效；旧搜索接口当前不可用")
+                        return True
+                    logger.warning("登录主页验证失败")
                     return False
                 else:
                     logger.warning(f"验证失败: {result['base_resp'].get('err_msg', '未知错误')}")
@@ -371,14 +414,14 @@ class WeChatSpiderLogin:
             token_match = re.search(r'token=(\d+)', current_url)
             if token_match:
                 self.token = token_match.group(1)
-                logger.success(f"Token获取成功: {self.token}")
+                logger.success("Token获取成功")
             else:
                 logger.error("无法从URL中提取token")
                 return False
 
             # 获取 cookies
-            raw_cookies = self.page.cookies(as_dict=True)
-            self.cookies = raw_cookies
+            raw_cookies = self.page.cookies()
+            self.cookies = cookies_to_dict(raw_cookies)
             logger.success(f"Cookies获取成功，共{len(self.cookies)}个")
 
             if self.save_cache():
@@ -420,7 +463,7 @@ class WeChatSpiderLogin:
                     'expireTime': expire_time.strftime('%Y-%m-%d %H:%M:%S'),
                     'hoursSinceLogin': round(hours_since_login, 1),
                     'hoursUntilExpire': round(hours_until_expire, 1),
-                    'token': self.token,
+                    'tokenPresent': bool(self.token),
                     'message': f'已登录 {round(hours_since_login, 1)} 小时'
                 }
             except:
