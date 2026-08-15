@@ -4,7 +4,7 @@ import { parseFeedDocument } from "../../packages/runtime/feed-reader.js";
 describe("parseFeedDocument", () => {
   it("parses RSS, Atom, and JSON Feed into one item shape", () => {
     const rss = parseFeedDocument(
-      `<rss><channel><title>RSS 示例</title><item><guid>1</guid><title>文章一</title><link>https://mp.weixin.qq.com/s/token1</link><description>摘要</description></item></channel></rss>`,
+      `<rss><channel><title>RSS 示例</title><item><guid>1</guid><title>文章一</title><link>https://mp.weixin.qq.com/s/token1</link><description>摘要</description><pubDate>Sat, 15 Aug 2026 08:00:00 GMT</pubDate></item></channel></rss>`,
       "application/rss+xml",
       "https://example.com/rss",
     );
@@ -20,5 +20,18 @@ describe("parseFeedDocument", () => {
     );
     expect([rss.format, atom.format, json.format]).toEqual(["rss", "atom", "json-feed"]);
     expect([rss.items[0]?.title, atom.items[0]?.title, json.items[0]?.title]).toEqual(["文章一", "文章二", "文章三"]);
+    expect(rss.items[0]?.publishedAt).toBe("2026-08-15T08:00:00.000Z");
+  });
+
+  it("rejects unsupported documents and discards incomplete entries", () => {
+    expect(() => parseFeedDocument("<html>not a feed</html>", "text/html", "https://example.com/not-feed")).toThrow(
+      "Source is not RSS, Atom, or JSON Feed",
+    );
+    const parsed = parseFeedDocument(
+      JSON.stringify({ version: "https://jsonfeed.org/version/1.1", items: [{ id: "missing" }, { id: "ok", title: "有效", url: "https://mp.weixin.qq.com/s/ok" }] }),
+      "application/feed+json",
+      "https://example.com/feed.json",
+    );
+    expect(parsed.items.map((item) => item.id)).toEqual(["ok"]);
   });
 });

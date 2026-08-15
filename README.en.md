@@ -24,7 +24,7 @@ npx @qbu11/wechat-agent-kit install
 Before the first npm registry release, use the pinned GitHub version directly:
 
 ```bash
-npx github:qbu11/wechat-article-spider#v0.1.0 install
+npx github:qbu11/wechat-article-spider#v0.2.0 install
 ```
 
 The installer previews its writes and asks for confirmation, then installs three standard Agent Skills for Claude Code, Codex, and generic `.agents/skills` consumers. There is no `postinstall`; dry runs, project scope, backups, and ownership-aware uninstall are built in.
@@ -46,7 +46,7 @@ There is no resident service, separate database, or built-in scheduler. The CLI 
 
 | Skill | Capability | Source |
 |---|---|---|
-| `wechat-search` | Keyword article search and account discovery | Local index + Sogou WeChat Search |
+| `wechat-search` | Keyword queries, exact-account time windows, and account discovery | Local index + Sogou WeChat Search |
 | `wechat-article` | Article body and metadata retrieval | `mp.weixin.qq.com` |
 | `wechat-subscribe` | Subscriptions, explicit sync, and health | RSS 2.0 / Atom / JSON Feed |
 
@@ -57,7 +57,8 @@ Every command emits structured JSON on stdout for predictable agent and script i
 Ask your agent to search for recent WeChat articles about a topic, summarize a supplied WeChat link with provenance, or subscribe to a supplied Atom feed and sync it once.
 
 ```bash
-wechat-agent search --type articles --query "OpenAI" --scope hybrid --limit 10 --json
+wechat-agent query --keywords "OpenAI" --scope hybrid --limit 10 --json
+wechat-agent query --account "Huxiu" --after 2026-08-01 --before 2026-08-15 --scope hybrid --limit 20 --json
 wechat-agent read --url "https://mp.weixin.qq.com/s/..." --content full --json
 wechat-agent subscribe --feed-url "https://example.com/wechat.xml" --label "My feed" --json
 wechat-agent sync --json
@@ -69,6 +70,8 @@ If the binary is not global, the bundled skills fall back to an exact-version `n
 ```bash
 npx @qbu11/wechat-agent-kit --help
 ```
+
+`query` does not fetch every article body. It runs local and network discovery concurrently and returns compact JSON as quickly as possible. Each result separates `originalUrl` from `discoveryUrl`; a Sogou redirect is never mislabeled as an original link. See the [Skill workflow and data-processing specification](docs/workflow-and-data-processing.md) for intent routing, provenance, deduplication, and sync rules.
 
 ## Honest boundaries
 
@@ -86,12 +89,13 @@ WeChat does not expose a stable public subscription API for this use. Persistent
 - The installer backs up conflicts and only uninstalls unchanged files that it owns.
 - Cookies, browser profiles, and authentication headers are not printed.
 
-See [Security](SECURITY.md), [Privacy](PRIVACY.md), and [Architecture](docs/architecture.md).
+See [Security](SECURITY.md), [Privacy](PRIVACY.md), [Architecture](docs/architecture.md), and the [robustness testing guide](docs/testing.md).
 
 ## Development
 
 ```bash
 npm ci
+npm run test:robustness
 npm run validate
 npm run build
 npm run pack:check

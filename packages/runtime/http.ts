@@ -88,7 +88,7 @@ export async function safeFetchText(input: string, options: SafeFetchOptions = {
       redirect: "manual",
       signal,
       headers: {
-        "user-agent": "wechat-agent-kit/0.1 (+https://github.com/qbu11/wechat-article-spider)",
+        "user-agent": "wechat-agent-kit/0.2 (+https://github.com/qbu11/wechat-article-spider)",
         accept: "text/html,application/rss+xml,application/atom+xml,application/feed+json,application/json;q=0.9,*/*;q=0.5",
         ...options.headers,
       },

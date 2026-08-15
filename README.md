@@ -24,7 +24,7 @@ npx @qbu11/wechat-agent-kit install
 在首个 npm 版本发布前，也可以直接使用固定的 GitHub 版本：
 
 ```bash
-npx github:qbu11/wechat-article-spider#v0.1.0 install
+npx github:qbu11/wechat-article-spider#v0.2.0 install
 ```
 
 安装器会先展示写入计划并请求确认，将 3 个标准 Agent Skills 安装到 Claude Code、Codex 和通用 `.agents/skills` 目录。它没有 `postinstall`，支持 `--dry-run`、项目级安装和安全卸载。
@@ -49,7 +49,7 @@ npx @qbu11/wechat-agent-kit install --agent codex --scope project --yes
 
 | Skill | 能力 | 数据来源 |
 |---|---|---|
-| `wechat-search` | 按关键词搜索文章、发现公众号 | 本地索引 + 搜狗微信搜索 |
+| `wechat-search` | 关键词查询、指定公众号时间段查询、发现公众号 | 本地索引 + 搜狗微信搜索 |
 | `wechat-article` | 从原始链接读取正文与元数据 | `mp.weixin.qq.com` |
 | `wechat-subscribe` | 保存订阅、手动同步、查看健康状态 | RSS 2.0 / Atom / JSON Feed |
 
@@ -68,8 +68,11 @@ npx @qbu11/wechat-agent-kit install --agent codex --scope project --yes
 也可以直接使用 CLI：
 
 ```bash
-# 全网发现 + 本地结果
-wechat-agent search --type articles --query "OpenAI" --scope hybrid --limit 10 --json
+# 关键词搜索：快速返回文章 JSON 和当前可用链接
+wechat-agent query --keywords "OpenAI" --scope hybrid --limit 10 --json
+
+# 指定公众号 + 时间段：与普通关键词搜索使用不同的明确意图
+wechat-agent query --account "虎嗅APP" --after 2026-08-01 --before 2026-08-15 --scope hybrid --limit 20 --json
 
 # 读取微信原文
 wechat-agent read --url "https://mp.weixin.qq.com/s/..." --content full --json
@@ -85,6 +88,8 @@ wechat-agent list --json
 ```bash
 npx @qbu11/wechat-agent-kit --help
 ```
+
+`query` 默认不抓取每篇正文，而是并行查询本地索引与网络来源，尽快返回紧凑 JSON。每条结果分别提供 `originalUrl` 与 `discoveryUrl`：只有已确认的非搜狗地址才会标记为原始链接。完整的 [Skill 流程图与数据处理规程](docs/workflow-and-data-processing.md) 解释了意图路由、去重、来源和同步规则。
 
 ## 订阅边界
 
@@ -102,12 +107,13 @@ npx @qbu11/wechat-agent-kit --help
 - 安装器只管理自己写入且未被用户修改的文件；覆盖前会备份，卸载不会删除已修改内容。
 - 不在日志或结果中输出 Cookie、浏览器配置与认证头。
 
-详见 [安全策略](SECURITY.md)、[隐私说明](PRIVACY.md) 与 [架构说明](docs/architecture.md)。
+详见 [安全策略](SECURITY.md)、[隐私说明](PRIVACY.md)、[架构说明](docs/architecture.md) 与 [健壮性测试指南](docs/testing.md)。
 
 ## 开发
 
 ```bash
 npm ci
+npm run test:robustness
 npm run validate
 npm run build
 npm run pack:check

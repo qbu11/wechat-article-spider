@@ -14,7 +14,7 @@ import { appDataDir, findPackageRoot, skillTargetRoot } from "./paths.js";
 import type { AgentTarget, InstallScope } from "./paths.js";
 
 const PACKAGE_NAME = "@qbu11/wechat-agent-kit";
-const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_VERSION = "0.2.0";
 
 export interface InstallOptions {
   agents: AgentTarget[];

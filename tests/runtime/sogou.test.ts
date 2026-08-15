@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
-import { parseSogouResults } from "../../packages/runtime/sogou.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConnectorError } from "../../packages/core/index.js";
+import { parseSogouResults, searchSogou } from "../../packages/runtime/sogou.js";
 
 const fixturePath = join(process.cwd(), "tests", "runtime", "fixtures", "sogou-result.html");
 
@@ -27,6 +28,8 @@ describe("parseSogouResults", () => {
     expect(first.source.id).toBe(second.source.id);
     expect(first.source.sourceUrl).not.toBe(second.source.sourceUrl);
     expect(first.article.metadata?.publicationHint).toBe("1786752000");
+    expect(first.article.publishedAt).toBe("2026-08-15T00:00:00.000Z");
+    expect(first.source.publishedAt).toBe(first.article.publishedAt);
   });
 
   it("does not use relative display dates as durable identity", async () => {
@@ -39,5 +42,24 @@ describe("parseSogouResults", () => {
 
     expect(yesterday.article.id).toBe(today.article.id);
     expect(yesterday.article.metadata?.publicationHint).toBeUndefined();
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe("searchSogou failure classification", () => {
+  it("returns a machine-readable CAPTCHA error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("请输入验证码", { status: 200 })));
+    const error = await searchSogou("测试", 1).catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(ConnectorError);
+    expect(error).toMatchObject({ code: "CAPTCHA_REQUIRED", retryable: true, needsUserAction: true });
+  });
+
+  it("classifies rate limits as retryable source failures", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("slow down", { status: 429 })));
+    const error = await searchSogou("测试", 1).catch((cause: unknown) => cause);
+    expect(error).toMatchObject({ code: "SOURCE_UNAVAILABLE", retryable: true, needsUserAction: false });
   });
 });

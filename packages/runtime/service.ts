@@ -18,6 +18,41 @@ import { safeFetchText } from "./http.js";
 import { searchSogou } from "./sogou.js";
 import { DefaultWechatFetcher, DefaultWechatParser } from "./wechat.js";
 
+export interface ArticleSearchOptions {
+  scope?: "local" | "global" | "hybrid";
+  limit?: number;
+  accountName?: string;
+  publishedAfter?: string;
+  publishedBefore?: string;
+}
+
+export interface ArticleSearchResponse {
+  results: ArticleSearchResult[];
+  warnings: string[];
+}
+
+function normalizedAccount(value: string): string {
+  return value.replaceAll(/\s+/g, " ").trim().normalize("NFC").toLocaleLowerCase();
+}
+
+function resultAccountNames(result: ArticleSearchResult): string[] {
+  return [
+    result.article.metadata?.accountName,
+    ...result.sources.flatMap((source) => [source.metadata?.accountName, source.metadata?.feedTitle]),
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+}
+
+function matchesArticleFilters(result: ArticleSearchResult, options: ArticleSearchOptions): boolean {
+  if (options.accountName) {
+    const expected = normalizedAccount(options.accountName);
+    if (!resultAccountNames(result).some((name) => normalizedAccount(name) === expected)) return false;
+  }
+  const publishedAt = result.article.publishedAt;
+  if (options.publishedAfter && (!publishedAt || publishedAt < options.publishedAfter)) return false;
+  if (options.publishedBefore && (!publishedAt || publishedAt > options.publishedBefore)) return false;
+  return true;
+}
+
 export interface RuntimeHandle {
   service: WechatAgentService;
   databasePath: string;
@@ -32,21 +67,70 @@ async function storeResult(repository: WechatRepository, result: ArticleSearchRe
 export class WechatAgentService {
   private readonly feedReader: FeedReader;
   private readonly direct: DirectWechatConnector;
+  private readonly articleDiscovery: typeof searchSogou;
 
-  constructor(readonly repository: WechatRepository, options: { feedReader?: FeedReader; direct?: DirectWechatConnector } = {}) {
+  constructor(
+    readonly repository: WechatRepository,
+    options: { feedReader?: FeedReader; direct?: DirectWechatConnector; articleDiscovery?: typeof searchSogou } = {},
+  ) {
     this.feedReader = options.feedReader ?? new DefaultFeedReader();
     this.direct = options.direct ?? new DirectWechatConnector(new DefaultWechatFetcher(), new DefaultWechatParser());
+    this.articleDiscovery = options.articleDiscovery ?? searchSogou;
   }
 
-  async searchArticles(query: string, options: { scope?: "local" | "global" | "hybrid"; limit?: number } = {}) {
+  async queryArticles(query: string, options: ArticleSearchOptions = {}): Promise<ArticleSearchResponse> {
     const scope = options.scope ?? "hybrid";
     const limit = Math.max(1, Math.min(options.limit ?? 10, 100));
-    const local = scope === "global" ? [] : await this.repository.articles.searchArticles({ text: query, limit });
-    const remote = scope === "local" ? [] : await searchSogou(query, limit);
-    for (const result of remote) await storeResult(this.repository, { article: result.article, sources: [result.source] });
-    const merged = new Map(local.map((result) => [result.article.id, result]));
-    for (const result of remote) merged.set(result.article.id, { article: result.article, sources: [result.source] });
-    return [...merged.values()].slice(0, limit);
+    const localLimit = options.accountName ? Math.min(200, Math.max(limit * 10, 50)) : limit;
+    const remoteLimit = options.accountName ? Math.min(100, Math.max(limit * 5, 20)) : limit;
+    const text = query.trim() || undefined;
+    const remoteQuery = [options.accountName, text].filter(Boolean).join(" ");
+    const [local, remoteOutcome] = await Promise.all([
+      scope === "global"
+        ? Promise.resolve([] as ArticleSearchResult[])
+        : this.repository.articles.searchArticles({
+            ...(text ? { text } : {}),
+            ...(options.publishedAfter ? { publishedAfter: options.publishedAfter } : {}),
+            ...(options.publishedBefore ? { publishedBefore: options.publishedBefore } : {}),
+            limit: localLimit,
+          }),
+      scope === "local"
+        ? Promise.resolve({ results: [] as Awaited<ReturnType<typeof searchSogou>>, error: undefined })
+        : this.articleDiscovery(remoteQuery, remoteLimit)
+            .then((results) => ({ results, error: undefined }))
+            .catch((error: unknown) => ({ results: [] as Awaited<ReturnType<typeof searchSogou>>, error })),
+    ]);
+    const remote = remoteOutcome.results;
+    const filteredLocal = local.filter((result) => matchesArticleFilters(result, options));
+    if (remoteOutcome.error && (scope === "global" || filteredLocal.length === 0)) throw remoteOutcome.error;
+    const filteredRemote = remote
+      .map((result) => ({ article: result.article, sources: [result.source] }))
+      .filter((result) => matchesArticleFilters(result, options));
+    const merged = new Map(filteredLocal.map((result) => [result.article.id, result]));
+    for (const result of filteredRemote) {
+      const existing = merged.get(result.article.id);
+      if (!existing) {
+        merged.set(result.article.id, result);
+        continue;
+      }
+      const sources = new Map([...existing.sources, ...result.sources].map((source) => [source.id, source]));
+      merged.set(result.article.id, {
+        article: existing.article,
+        sources: [...sources.values()],
+      });
+    }
+    for (const result of merged.values()) await storeResult(this.repository, result);
+    const results = [...merged.values()]
+      .sort((a, b) => (b.article.publishedAt ?? "").localeCompare(a.article.publishedAt ?? ""))
+      .slice(0, limit);
+    const warnings = remoteOutcome.error
+      ? [`Global discovery degraded: ${remoteOutcome.error instanceof Error ? remoteOutcome.error.message : String(remoteOutcome.error)}`]
+      : [];
+    return { results, warnings };
+  }
+
+  async searchArticles(query: string, options: ArticleSearchOptions = {}) {
+    return (await this.queryArticles(query, options)).results;
   }
 
   async searchAccounts(query: string, limit = 10): Promise<Account[]> {
@@ -163,7 +247,14 @@ export class WechatAgentService {
       let stored = 0;
       for (const item of page.items) {
         const existing = await this.repository.articles.getArticle(item.article.id);
-        await storeResult(this.repository, { article: item.article, sources: [item.source] });
+        const subscriptionAccount = subscription.label?.trim();
+        const article = subscriptionAccount
+          ? { ...item.article, metadata: { ...item.article.metadata, accountName: subscriptionAccount } }
+          : item.article;
+        const source = subscriptionAccount
+          ? { ...item.source, metadata: { ...item.source.metadata, accountName: subscriptionAccount } }
+          : item.source;
+        await storeResult(this.repository, { article, sources: [source] });
         if (!existing) stored += 1;
       }
       const completedAt = new Date().toISOString();

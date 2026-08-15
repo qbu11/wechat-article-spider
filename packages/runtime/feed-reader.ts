@@ -21,6 +21,13 @@ function text(value: unknown): string | undefined {
   return undefined;
 }
 
+function isoDate(value: unknown): string | undefined {
+  const input = text(value)?.trim();
+  if (!input) return undefined;
+  const parsed = new Date(input);
+  return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString();
+}
+
 function rssItem(item: Record<string, unknown>): ParsedFeedItem | undefined {
   const url = text(item.link) ?? text(item.guid);
   const title = text(item.title);
@@ -32,7 +39,7 @@ function rssItem(item: Record<string, unknown>): ParsedFeedItem | undefined {
     author: text(item.author ?? item["dc:creator"]),
     summary: text(item.description),
     contentHtml: text(item["content:encoded"]),
-    publishedAt: text(item.pubDate),
+    publishedAt: isoDate(item.pubDate),
   }) as ParsedFeedItem;
 }
 
@@ -56,8 +63,8 @@ function atomItem(item: Record<string, unknown>): ParsedFeedItem | undefined {
     author: text((item.author as Record<string, unknown> | undefined)?.name),
     summary: text(item.summary),
     contentHtml: text(item.content),
-    publishedAt: text(item.published ?? item.updated),
-    modifiedAt: text(item.updated),
+    publishedAt: isoDate(item.published ?? item.updated),
+    modifiedAt: isoDate(item.updated),
   }) as ParsedFeedItem;
 }
 
@@ -81,8 +88,8 @@ export function parseFeedDocument(body: string, contentType: string, finalUrl: s
         summary: text(item.summary),
         contentHtml: text(item.content_html),
         contentText: text(item.content_text),
-        publishedAt: text(item.date_published),
-        modifiedAt: text(item.date_modified),
+        publishedAt: isoDate(item.date_published),
+        modifiedAt: isoDate(item.date_modified),
       }) as ParsedFeedItem).filter((item) => item.url && item.title).slice(0, limit);
       const title = text(value.title);
       return { format: "json-feed", url: finalUrl, items, ...(title ? { title } : {}) };

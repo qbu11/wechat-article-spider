@@ -1,5 +1,5 @@
 import { load } from "cheerio";
-import { createStableId, type Article, type ArticleSource } from "../core/index.js";
+import { ConnectorError, createStableId, type Article, type ArticleSource } from "../core/index.js";
 import { safeFetchText } from "./http.js";
 
 export interface SogouResult {
@@ -41,6 +41,15 @@ export function parseSogouResults(
     const unixTimestamp = rawPublication.match(/timeConvert\(\s*['\"]?(\d{8,})/i)?.[1];
     const explicitPublication = unixTimestamp ?? publication.attr("datetime") ?? publication.attr("data-time") ?? "";
     const publicationHint = normalizeIdentityPart(explicitPublication);
+    const publicationNumber = Number(explicitPublication);
+    const publishedAt = explicitPublication
+      ? new Date(
+          Number.isFinite(publicationNumber) && /^\d+$/.test(explicitPublication)
+            ? publicationNumber * (explicitPublication.length >= 13 ? 1 : 1000)
+            : explicitPublication,
+        )
+      : undefined;
+    const publishedAtIso = publishedAt && !Number.isNaN(publishedAt.valueOf()) ? publishedAt.toISOString() : undefined;
     const stableParts = [
       normalizeIdentityPart(accountName),
       normalizeIdentityPart(title),
@@ -53,6 +62,7 @@ export function parseSogouResults(
         title,
         ...(summary ? { summary } : {}),
         canonicalUrl: sourceUrl,
+        ...(publishedAtIso ? { publishedAt: publishedAtIso } : {}),
         createdAt: now,
         updatedAt: now,
         metadata: {
@@ -68,6 +78,7 @@ export function parseSogouResults(
         connectorKind: "sogou",
         sourceUrl,
         discoveredAt: now,
+        ...(publishedAtIso ? { publishedAt: publishedAtIso } : {}),
         metadata: { accountName, ...(publicationHint ? { publicationHint } : {}) },
       },
     });
@@ -81,9 +92,16 @@ export async function searchSogou(query: string, limit = 10): Promise<SogouResul
   url.searchParams.set("query", query);
   url.searchParams.set("ie", "utf8");
   const response = await safeFetchText(url.href, { allowedHosts: new Set(["weixin.sogou.com"]), maxBytes: 3 * 1024 * 1024 });
-  if (response.status !== 200) throw new Error(`Sogou WeChat search returned HTTP ${response.status}`);
+  if (response.status !== 200) {
+    throw new ConnectorError("SOURCE_UNAVAILABLE", `Sogou WeChat search returned HTTP ${response.status}`, {
+      retryable: response.status === 429 || response.status >= 500,
+    });
+  }
   if (/请输入验证码|antispider|访问过于频繁/.test(response.body)) {
-    throw new Error("Sogou requires browser verification. Complete the captcha manually and retry later.");
+    throw new ConnectorError("CAPTCHA_REQUIRED", "Sogou requires browser verification. Complete the captcha manually and retry later.", {
+      retryable: true,
+      needsUserAction: true,
+    });
   }
   return parseSogouResults(response.body, { limit });
 }

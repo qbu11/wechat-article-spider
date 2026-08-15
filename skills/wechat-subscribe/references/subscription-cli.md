@@ -3,13 +3,13 @@
 Use `wechat-agent` by default. If it is not on `PATH`, first replace only the executable portion with the exact npm version:
 
 ```bash
-npx -y @qbu11/wechat-agent-kit@0.1.0 <command> ... --json
+npx -y @qbu11/wechat-agent-kit@0.2.0 <command> ... --json
 ```
 
 Only when npm reports `E404` or explicitly says that this package/version is unpublished, retry the same command from the fixed Git tag:
 
 ```bash
-npx -y github:qbu11/wechat-article-spider#v0.1.0 <command> ... --json
+npx -y github:qbu11/wechat-article-spider#v0.2.0 <command> ... --json
 ```
 
 The GitHub fallback is slower on its first run but can be cached by npm. Do not use it for authentication, connectivity, integrity, or runtime failures; report those errors instead. Never use an unpinned package version, `main`, or `master` during an agent-run workflow.
@@ -75,7 +75,7 @@ Use status to distinguish database readiness, feed health, recent sync runs, and
 After sync, search the local index using known article or publisher metadata:
 
 ```bash
-wechat-agent search --type articles --query "<publisher or topic>" --scope local --limit 20 --json
+wechat-agent query --account "<exact publisher label>" --scope local --limit 20 --json
 ```
 
 Do not interpret an empty result as proof of no publications when the feed is stale or incomplete.

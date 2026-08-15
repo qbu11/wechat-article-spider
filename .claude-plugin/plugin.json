@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "wechat-agent-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Search and read WeChat Official Account articles, and synchronize verified feed subscriptions through local-first Agent Skills and a JSON CLI.",
   "author": {
     "name": "qbu11",

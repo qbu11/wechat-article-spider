@@ -1,6 +1,6 @@
 {
   "name": "@qbu11/wechat-agent-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Local-first WeChat Official Account search, reading, and subscription tools for AI agents.",
   "type": "module",
   "license": "MIT",
@@ -59,6 +59,8 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "test:robustness": "vitest run tests/core tests/runtime tests/cli",
+    "test:python": "python3 -m pytest -q",
     "test:watch": "vitest",
     "validate:skills": "node scripts/validate-skills.mjs",
     "validate:plugin": "node scripts/validate-plugins.mjs",

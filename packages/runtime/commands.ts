@@ -1,4 +1,11 @@
 import { openRuntime } from "./service.js";
+import {
+  createFastQueryEnvelope,
+  inferArticleQueryIntent,
+  parseDateBoundary,
+  type ArticleQueryIntent,
+  type ArticleQueryScope,
+} from "./query.js";
 
 export interface RuntimeCommandInput {
   positionals: string[];
@@ -18,6 +25,12 @@ function required(value: string | undefined, message: string): string {
   return value.trim();
 }
 
+function scope(value: string | undefined): ArticleQueryScope {
+  const result = value ?? "hybrid";
+  if (result !== "local" && result !== "global" && result !== "hybrid") throw new Error(`Unsupported search scope: ${result}`);
+  return result;
+}
+
 export async function runRuntimeCommand(command: string, input: RuntimeCommandInput) {
   const runtime = await openRuntime();
   try {
@@ -29,10 +42,48 @@ export async function runRuntimeCommand(command: string, input: RuntimeCommandIn
         const limit = integer(input.values.get("--limit"), 10);
         if (type === "accounts") data = await runtime.service.searchAccounts(query, limit);
         else if (type === "articles") {
-          const scope = (input.values.get("--scope") ?? "hybrid") as "local" | "global" | "hybrid";
-          if (!["local", "global", "hybrid"].includes(scope)) throw new Error(`Unsupported search scope: ${scope}`);
-          data = await runtime.service.searchArticles(query, { scope, limit });
+          const selectedScope = scope(input.values.get("--scope"));
+          const publishedAfter = parseDateBoundary(input.values.get("--after"), "after");
+          const publishedBefore = parseDateBoundary(input.values.get("--before"), "before");
+          data = await runtime.service.searchArticles(query, {
+            scope: selectedScope,
+            limit,
+            ...(input.values.get("--account") ? { accountName: input.values.get("--account")! } : {}),
+            ...(publishedAfter ? { publishedAfter } : {}),
+            ...(publishedBefore ? { publishedBefore } : {}),
+          });
         } else throw new Error(`Unsupported search type: ${type}`);
+        break;
+      }
+      case "query": {
+        const keywords = (input.values.get("--keywords") ?? input.values.get("--query") ?? input.positionals.join(" ")) || undefined;
+        const account = input.values.get("--account");
+        const requestedIntent = input.values.get("--intent") as ArticleQueryIntent | undefined;
+        if (requestedIntent && requestedIntent !== "keyword-search" && requestedIntent !== "account-window") {
+          throw new Error(`Unsupported query intent: ${requestedIntent}`);
+        }
+        const after = parseDateBoundary(input.values.get("--after"), "after");
+        const before = parseDateBoundary(input.values.get("--before"), "before");
+        if (after && before && after > before) throw new Error("--after must not be later than --before");
+        const request = {
+          ...(requestedIntent ? { intent: requestedIntent } : {}),
+          ...(keywords?.trim() ? { keywords: keywords.trim() } : {}),
+          ...(account?.trim() ? { account: account.trim() } : {}),
+          ...(after ? { after } : {}),
+          ...(before ? { before } : {}),
+          scope: scope(input.values.get("--scope")),
+          limit: integer(input.values.get("--limit"), 10),
+        };
+        inferArticleQueryIntent(request);
+        const startedAt = performance.now();
+        const response = await runtime.service.queryArticles(request.keywords ?? "", {
+          scope: request.scope,
+          limit: request.limit,
+          ...(request.account ? { accountName: request.account } : {}),
+          ...(request.after ? { publishedAfter: request.after } : {}),
+          ...(request.before ? { publishedBefore: request.before } : {}),
+        });
+        data = createFastQueryEnvelope(request, response.results, performance.now() - startedAt, response.warnings);
         break;
       }
       case "read": {

@@ -31,3 +31,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 wechat_article_spider = ["skill_data/**/*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

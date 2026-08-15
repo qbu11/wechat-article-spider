@@ -67,6 +67,8 @@ Usage:
   wechat-agent install [--agent all|claude-code,codex,generic] [--scope user|project]
                        [--dry-run] [--yes] [--json]
   wechat-agent doctor [--json]
+  wechat-agent query --keywords <text> [--after DATE] [--before DATE] [--scope local|global|hybrid] [--limit N] --json
+  wechat-agent query --account <name> [--keywords <text>] [--after DATE] [--before DATE] [--scope local|global|hybrid] [--limit N] --json
   wechat-agent search --type articles|accounts --query <text> [--scope local|global|hybrid] [--limit N] --json
   wechat-agent read --url <wechat-url> | --article-id <id> [--content metadata|excerpt|full] --json
   wechat-agent subscribe --feed-url <rss-atom-or-json-feed-url> [--label <name>] --json
@@ -147,6 +149,7 @@ async function main(): Promise<void> {
       await handleDoctor(parsed.flags.has("--json"));
       return;
     case "search":
+    case "query":
     case "read":
     case "subscribe":
     case "unsubscribe":

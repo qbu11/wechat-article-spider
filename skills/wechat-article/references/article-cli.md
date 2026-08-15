@@ -9,16 +9,16 @@ wechat-agent read --url "https://mp.weixin.qq.com/s/example" --content full --js
 If `wechat-agent` is not on `PATH`, first try the exact npm version:
 
 ```bash
-npx -y @qbu11/wechat-agent-kit@0.1.0 read --url "https://mp.weixin.qq.com/s/example" --content full --json
+npx -y @qbu11/wechat-agent-kit@0.2.0 read --url "https://mp.weixin.qq.com/s/example" --content full --json
 ```
 
 Only when npm reports `E404` or explicitly says that this package/version is unpublished, retry the same command from the fixed Git tag:
 
 ```bash
-npx -y github:qbu11/wechat-article-spider#v0.1.0 read --url "https://mp.weixin.qq.com/s/example" --content full --json
+npx -y github:qbu11/wechat-article-spider#v0.2.0 read --url "https://mp.weixin.qq.com/s/example" --content full --json
 ```
 
-The GitHub fallback is slower on its first run but can be cached by npm. Do not use it for authentication, connectivity, integrity, or runtime failures; report those errors instead. Never replace `0.1.0` with `latest`, and never use `main` or `master`.
+The GitHub fallback is slower on its first run but can be cached by npm. Do not use it for authentication, connectivity, integrity, or runtime failures; report those errors instead. Never replace `0.2.0` with `latest`, and never use `main` or `master`.
 
 ## Arguments
 

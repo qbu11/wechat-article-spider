@@ -37,8 +37,10 @@ that Sogou search is a durable subscription source.
 
 ## Runtime flow
 
-1. `search --scope local` queries SQLite. `global` queries Sogou, and `hybrid`
-   merges local and best-effort remote results.
+1. `query --keywords` resolves a keyword-search intent; `query --account` resolves
+   an account-window intent with optional inclusive publication dates. `local`
+   queries SQLite, `global` queries Sogou, and `hybrid` runs both concurrently.
+   Fast query output separates confirmed original URLs from discovery redirects.
 2. `read` accepts an indexed article ID or a direct WeChat/Sogou result URL,
    validates redirects, parses the page, and stores provenance locally.
 3. `subscribe` fetches a supplied URL, confirms RSS/Atom/JSON Feed format, and
@@ -75,3 +77,6 @@ uninstall. npm `postinstall` is not used.
 Legacy Python login behavior is isolated from the Node architecture. Its WC01
 credential representation is not encrypted; see
 [legacy-python.md](legacy-python.md).
+
+See [workflow-and-data-processing.md](workflow-and-data-processing.md) for the
+full flowcharts and data rules, and [testing.md](testing.md) for release gates.
