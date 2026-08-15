@@ -13,7 +13,9 @@ import random
 import time
 import os
 import csv
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 
 from tqdm import tqdm
 import bs4
@@ -162,36 +164,153 @@ def _extract_fallback_content(soup, content_ele):
     return ''.join(content_parts) if content_parts else None
 
 
+@dataclass(frozen=True)
+class ArticleParseResult:
+    """Stable parser result used by the Node migration golden fixtures."""
+
+    status: str
+    article_type: str
+    content: str = ""
+    error: Optional[str] = None
+
+
+CONTENT_SELECTORS = [
+    ".rich_media_content",
+    "#js_content",
+    "#js_image_content",
+    ".image_content",
+    "#js_image_desc",
+    ".share_notice",
+    ".swiper_item_img",
+    "#img_swiper_content",
+    ".share_media_swiper_content",
+    ".img_swiper_area",
+    "#js_video_content",
+    ".video_content",
+    ".rich_media_video",
+    ".rich_media_area_primary",
+    ".rich_media_area_primary_inner",
+    "#js_article_content",
+    "#js_content_container",
+    "#page-content",
+    ".rich_media_inner",
+    ".rich_media_wrp",
+    "article",
+    ".article",
+    "#article",
+]
+
+PAGE_STATE_MARKERS = {
+    "blocked": (
+        "环境异常",
+        "完成验证后即可继续访问",
+        "访问过于频繁",
+        "操作频繁",
+    ),
+    "expired": (
+        "该内容已被发布者删除",
+        "此内容因违规无法查看",
+        "该内容已被发布者删除或屏蔽",
+        "内容已过期",
+    ),
+}
+
+
+def _extract_video_article_content(soup, content_ele):
+    """Preserve readable copy and public media links from a video article."""
+    content_parts = []
+    title = soup.select_one('.rich_media_title, #activity-name, h1')
+    if title and title.get_text(strip=True):
+        content_parts.append(f"# {title.get_text(strip=True)}\n")
+
+    if content_ele:
+        converted = md(content_ele, keep_inline_images_in=["section", "span"])
+        if converted.strip():
+            content_parts.append(f"\n{converted.strip()}\n")
+
+    seen = set()
+    for element in soup.select(
+        'video[src], video[data-src], iframe[src], iframe[data-src], mp-video[src]'
+    ):
+        source = element.get('data-src') or element.get('src') or ''
+        source = _decode_html_entities(source.strip())
+        if source.startswith(('https://', 'http://')) and source not in seen:
+            seen.add(source)
+            content_parts.append(f"\n[视频]({source})\n")
+    return ''.join(content_parts).strip()
+
+
+def parse_article_html(html_text):
+    """Parse a captured WeChat page without performing network requests.
+
+    ``status`` distinguishes genuine article content from access-control and
+    removed-content pages, preventing agents from indexing an error page as an
+    article. The function is intentionally deterministic for golden fixtures.
+    """
+    soup = bs4.BeautifulSoup(html_text or "", 'lxml')
+    page_text = soup.get_text(" ", strip=True)
+    has_article_container = bool(
+        soup.select('.rich_media_content, #js_content, #js_image_content, #js_video_content')
+    )
+    looks_like_error_page = bool(
+        soup.select('.weui-msg, .weui_msg, #js_error_msg, .page_msg')
+    ) or not has_article_container
+    if looks_like_error_page:
+        for status, markers in PAGE_STATE_MARKERS.items():
+            if any(marker in page_text for marker in markers):
+                message = "页面访问受限" if status == "blocked" else "文章已删除、屏蔽或过期"
+                return ArticleParseResult(status=status, article_type="unavailable", error=message)
+
+    _preprocess_lazy_images(soup)
+    body_classes = soup.body.get('class', []) if soup.body else []
+    is_image_article = 'page_share_img' in body_classes or bool(
+        soup.select('.swiper_item, .swiper_item_img, .share_media_swiper')
+    )
+    is_video_article = bool(
+        soup.select('#js_video_content, .video_content, .rich_media_video, video, mp-video')
+    )
+
+    if is_image_article:
+        content = _extract_image_article_content(soup) or ""
+        if len(content.strip()) >= 10:
+            return ArticleParseResult("ok", "image", content.strip())
+
+    content_ele = None
+    for selector in CONTENT_SELECTORS:
+        matches = soup.select(selector)
+        if matches:
+            content_ele = matches[0]
+            logger.debug(f"使用选择器 '{selector}' 匹配到内容元素")
+            break
+
+    if is_video_article:
+        content = _extract_video_article_content(soup, content_ele)
+        if len(content.strip()) >= 10:
+            return ArticleParseResult("ok", "video", content.strip())
+
+    content = ""
+    if content_ele:
+        content = md(content_ele, keep_inline_images_in=["section", "span"])
+        if len(content.strip()) < 10:
+            fallback = _extract_fallback_content(soup, content_ele)
+            if fallback and len(fallback.strip()) > len(content.strip()):
+                content = fallback
+
+    if len(content.strip()) >= 10:
+        return ArticleParseResult("ok", "normal", content.strip())
+
+    content = _extract_all_text_content(soup)
+    if len(content.strip()) >= 10:
+        return ArticleParseResult("ok", "normal", content.strip())
+    return ArticleParseResult(
+        status="empty",
+        article_type="unknown",
+        error="未找到有效文章内容",
+    )
+
+
 def get_article_content(url, headers, max_retries=3, retry_delay=2):
     """获取文章正文内容并转换为 Markdown"""
-    CONTENT_SELECTORS = [
-        ".rich_media_content",
-        "#js_content",
-        "#js_image_content",
-        ".image_content",
-        "#js_image_desc",
-        ".share_notice",
-        ".swiper_item_img",
-        "#img_swiper_content",
-        ".share_media_swiper_content",
-        ".img_swiper_area",
-        "#js_video_content",
-        ".video_content",
-        ".rich_media_video",
-        ".rich_media_area_primary",
-        ".rich_media_area_primary_inner",
-        "#js_article_content",
-        "#js_content_container",
-        "#page-content",
-        ".rich_media_inner",
-        ".rich_media_wrp",
-        "article",
-        ".article",
-        "#article",
-    ]
-
-    MIN_CONTENT_LENGTH = 10
-
     for attempt in range(max_retries):
         try:
             response = requests.get(url, headers=headers, timeout=30)
@@ -202,43 +321,13 @@ def get_article_content(url, headers, max_retries=3, retry_delay=2):
                     continue
                 return f"请求失败，状态码: {response.status_code}"
 
-            soup = bs4.BeautifulSoup(response.text, 'lxml')
-
-            _preprocess_lazy_images(soup)
-
-            body_classes = soup.body.get('class', []) if soup.body else []
-            is_image_article = 'page_share_img' in body_classes
-
-            has_swiper = bool(soup.select('.swiper_item, .swiper_item_img, .share_media_swiper'))
-
-            if is_image_article or has_swiper:
-                logger.info(f"检测到图片类型文章（page_share_img={is_image_article}, swiper={has_swiper}），使用特殊处理")
-                content = _extract_image_article_content(soup)
-                if content and len(content.strip()) >= MIN_CONTENT_LENGTH:
-                    return content
-
-            content_ele = None
-            for selector in CONTENT_SELECTORS:
-                content_ele = soup.select(selector)
-                if content_ele:
-                    logger.debug(f"使用选择器 '{selector}' 匹配到内容元素")
-                    break
-
-            content = ""
-            if content_ele:
-                content = md(content_ele[0], keep_inline_images_in=["section", "span"])
-
-                content_stripped = content.strip()
-                if len(content_stripped) < MIN_CONTENT_LENGTH:
-                    logger.warning(f"Markdown转换后内容过短({len(content_stripped)}字符)，尝试备用提取方法")
-                    fallback_content = _extract_fallback_content(soup, content_ele[0])
-                    if fallback_content and len(fallback_content.strip()) > len(content_stripped):
-                        content = fallback_content
-                        logger.info("使用备用提取方法成功获取内容")
-
-            if content and len(content.strip()) >= MIN_CONTENT_LENGTH:
-                logger.info(f"成功获取文章内容，长度: {len(content.strip())} 字符")
-                return content
+            result = parse_article_html(response.text)
+            if result.status == "ok":
+                logger.info(f"成功获取{result.article_type}文章内容，长度: {len(result.content)} 字符")
+                return result.content
+            if result.status in ("blocked", "expired"):
+                logger.warning(result.error)
+                return f"获取文章内容失败: {result.error}"
 
             if attempt < max_retries - 1:
                 logger.warning(f"内容为空或过短，可能页面未完全加载，{retry_delay}秒后重试 ({attempt + 1}/{max_retries})")
@@ -246,9 +335,7 @@ def get_article_content(url, headers, max_retries=3, retry_delay=2):
                 retry_delay = min(retry_delay * 1.5, 10)
             else:
                 logger.warning(f"重试{max_retries}次后仍无法获取有效内容，URL: {url}")
-                if not content:
-                    content = _extract_all_text_content(soup)
-                return content
+                return ""
 
         except requests.exceptions.Timeout:
             logger.warning(f"请求超时，尝试 {attempt + 1}/{max_retries}")

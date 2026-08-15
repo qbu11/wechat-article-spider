@@ -9,6 +9,72 @@
 
 import os
 import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import json
+
+
+PRIVATE_DIR_MODE = 0o700
+PRIVATE_FILE_MODE = 0o600
+
+
+def _chmod_best_effort(path: str, mode: int) -> None:
+    """Apply least-privilege permissions where the platform supports chmod."""
+    try:
+        os.chmod(path, mode)
+    except OSError:
+        # Windows ACLs are not faithfully represented by POSIX modes. The
+        # installer is responsible for applying a user-only ACL there.
+        pass
+
+
+def ensure_private_directory(path: str, *, harden_existing: bool = True) -> str:
+    """Create a private directory without unexpectedly chmod-ing custom parents."""
+    existed = os.path.isdir(path)
+    os.makedirs(path, mode=PRIVATE_DIR_MODE, exist_ok=True)
+    if harden_existing or not existed:
+        _chmod_best_effort(path, PRIVATE_DIR_MODE)
+    return path
+
+
+def secure_json_write(path: str, data: Any) -> None:
+    """Atomically write sensitive JSON with owner-only permissions.
+
+    The temporary file is created in the destination directory so ``replace``
+    remains atomic. No credential bytes are ever written to a broadly readable
+    default-mode file.
+    """
+    destination = Path(path)
+    # A caller may intentionally place a custom cache inside a project folder;
+    # do not change permissions of an existing parent we do not own.
+    ensure_private_directory(str(destination.parent), harden_existing=False)
+    fd, temp_path = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=str(destination.parent)
+    )
+    try:
+        _chmod_best_effort(temp_path, PRIVATE_FILE_MODE)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            fd = -1
+            json.dump(data, handle, ensure_ascii=False, indent=2)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp_path, destination)
+        _chmod_best_effort(str(destination), PRIVATE_FILE_MODE)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        try:
+            os.remove(temp_path)
+        except FileNotFoundError:
+            pass
+
+
+def harden_private_file(path: str) -> None:
+    """Tighten permissions of a legacy credential file after discovery."""
+    if os.path.isfile(path):
+        _chmod_best_effort(path, PRIVATE_FILE_MODE)
 
 
 def get_app_data_dir() -> str:
@@ -26,9 +92,11 @@ def get_app_data_dir() -> str:
 
     data_dir = os.path.join(app_data, 'WeChatSpider')
     try:
-        os.makedirs(data_dir, exist_ok=True)
-    except OSError:
-        data_dir = os.path.abspath('.')
+        ensure_private_directory(data_dir)
+    except OSError as exc:
+        # Never fall back to the current working directory for credentials: it
+        # may be a shared checkout, CI workspace, or web-served directory.
+        raise RuntimeError(f"无法创建私有应用数据目录: {data_dir}") from exc
     return data_dir
 
 

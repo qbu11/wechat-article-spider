@@ -1,0 +1,27 @@
+{
+  "article_normal.html": {
+    "status": "ok",
+    "article_type": "normal",
+    "contains": ["普通文章正文", "核心结论", "redacted-normal/640"]
+  },
+  "article_image.html": {
+    "status": "ok",
+    "article_type": "image",
+    "contains": ["示例图片故事", "redacted-image-a/640", "redacted-image-b/640"]
+  },
+  "article_video.html": {
+    "status": "ok",
+    "article_type": "video",
+    "contains": ["示例视频访谈", "视频简介", "mpvideo.qpic.cn/redacted/video.mp4"]
+  },
+  "article_blocked.html": {
+    "status": "blocked",
+    "article_type": "unavailable",
+    "error": "页面访问受限"
+  },
+  "article_expired.html": {
+    "status": "expired",
+    "article_type": "unavailable",
+    "error": "文章已删除、屏蔽或过期"
+  }
+}

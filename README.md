@@ -1,435 +1,118 @@
-# wechat-article-spider
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/hero-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/hero-light.svg">
+    <img alt="WeChat Agent Kit" src="assets/hero-light.svg" width="920">
+  </picture>
 
-微信公众号文章爬取 CLI 工具 | WeChat Official Account Article Spider CLI
+  <p><strong>让 AI Agent 搜索、阅读和订阅微信公众号文章。</strong></p>
 
----
+  [![npm](https://img.shields.io/npm/v/@qbu11/wechat-agent-kit?color=07c160&label=npm)](https://www.npmjs.com/package/@qbu11/wechat-agent-kit)
+  [![CI](https://github.com/qbu11/wechat-article-spider/actions/workflows/ci.yml/badge.svg)](https://github.com/qbu11/wechat-article-spider/actions/workflows/ci.yml)
+  [![Agent Skills](https://img.shields.io/badge/Agent%20Skills-compatible-111827)](https://agentskills.io)
+  [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**中文** | [English](#english)
+  **中文** · [English](README.en.md)
+</div>
 
-## 简介
-
-`wechat-article-spider` 是一个自包含的微信公众号文章爬取命令行工具。通过微信公众平台 API，支持公众号搜索、文章列表获取、正文内容提取（Markdown 格式），并可集成到 Claude Code / OpenClaw 作为 Skill 使用。
-
-### 功能特性
-
-- 扫码登录，凭证自动缓存（约 4 天有效）
-- 按名称搜索公众号
-- 单个 / 批量爬取公众号文章
-- 正文提取为 Markdown，支持图片、视频等多种文章类型
-- JSON 结构化输出，便于工具集成
-- 一键部署为 Claude Code / OpenClaw Skill
-
-## 安装
+## 一条命令安装
 
 ```bash
-# 从 GitHub 安装
-pip install git+https://github.com/qbu11/wechat-article-spider.git
-
-# 或克隆后本地安装
-git clone https://github.com/qbu11/wechat-article-spider.git
-pip install ./wechat-article-spider
+npx @qbu11/wechat-agent-kit install
 ```
 
-### 环境要求
-
-- Python >= 3.8
-- Chrome 浏览器（登录时需要）
-
-### 部署为 Claude Code / OpenClaw Skill（可选）
+在首个 npm 版本发布前，也可以直接使用固定的 GitHub 版本：
 
 ```bash
-wechat-spider install-skill
+npx github:qbu11/wechat-article-spider#v0.1.0 install
 ```
 
-自动将 SKILL.md 部署到以下路径：
-
-| 平台 | 部署路径 |
-|------|----------|
-| Claude Code | `~/.claude/skills/wechat-article-spider/SKILL.md` |
-| OpenClaw | `~/.openclaw/skills/wechat-article-spider/SKILL.md` |
-
-部署后可通过 `/wechat-article-spider` 触发。
-
-## 快速开始
-
-### 两种搜索模式
-
-本工具支持两种搜索模式：
-
-1. **按公众号名称搜索**：用户知道具体公众号名，使用 CLI 工具直接爬取
-2. **按文章关键词搜索**：用户想跨公众号搜索相关文章，需配合 Chrome DevTools MCP 使用搜狗微信搜索
-
-**自动判断**：先运行 `wechat-spider search "关键词"`，如果返回的公众号列表不相关，则切换到搜狗搜索模式。
-
-### 自然语言使用指南（推荐）
-
-如果你在 Claude Code / OpenClaw 中使用本工具，直接用自然语言描述你的需求即可，Claude 会自动调用合适的命令。
-
-**示例：**
-
-```
-# 搜索相关
-"帮我搜索极客公园这个公众号"
-"查找一下科技美学最近的发文"
-
-# 爬取文章
-"获取极客公园最近7天的文章"
-"帮我爬取虎嗅最近30天的文章，要包含正文内容"
-"抓取36氪最近一周的所有文章，保存到CSV文件"
-
-# 批量操作
-"帮我批量爬取极客公园、爱范儿、机器之心这三家最近3天的文章"
-"获取几个主流科技媒体（极客公园、爱范儿、机器之心）最近的AI相关文章"
-
-# 检查状态
-"检查一下登录状态"
-"我需要重新登录微信"
-```
-
-Claude 会根据你的需求自动选择合适的命令和参数，无需记忆具体的 CLI 语法。
-
-### CLI 快速上手
-
-如果你直接使用命令行，以下是常用命令：
+安装器会先展示写入计划并请求确认，将 3 个标准 Agent Skills 安装到 Claude Code、Codex 和通用 `.agents/skills` 目录。它没有 `postinstall`，支持 `--dry-run`、项目级安装和安全卸载。
 
 ```bash
-# 1. 登录（首次使用，需微信扫码）
-wechat-spider login
+# 先预览，不写文件
+npx @qbu11/wechat-agent-kit install --dry-run
 
-# 2. 检查登录状态
-wechat-spider status
-
-# 3. 搜索公众号
-wechat-spider search "极客公园"
-
-# 4. 爬取文章（标题 + 链接）
-wechat-spider scrape "极客公园" --pages 5 --days 30
-
-# 5. 爬取文章（含正文）
-wechat-spider scrape "极客公园" --pages 5 --days 30 --content
-
-# 6. 保存到 CSV
-wechat-spider scrape "极客公园" --pages 5 --days 30 --content --output result.csv
-
-# 7. 批量爬取
-wechat-spider batch "极客公园,爱范儿,机器之心" --pages 3 --days 7 --content
-
-# 8. 导出登录凭证（用于无头服务器部署）
-wechat-spider export-login
-
-# 9. 在无头服务器上导入凭证
-wechat-spider import-login "导出的凭证字符串"
+# 只安装到当前项目的 Codex skills
+npx @qbu11/wechat-agent-kit install --agent codex --scope project --yes
 ```
 
-### 无头服务器部署
+要求 Node.js 22.13 或更新版本；推荐当前 Node.js 24 LTS。
 
-如果需要在无浏览器的服务器上使用，可以先在本地机器上登录并导出凭证：
+## 为什么它足够简单
+
+```text
+你的 Agent → 3 个 SKILL.md → wechat-agent JSON CLI → 一个本地 SQLite 文件
+```
+
+没有常驻服务，没有独立数据库，没有自动运行的后台任务。SQLite 是 Node.js 自带能力，CLI 会自动创建和维护；它只用来保存订阅、索引文章和同步状态。
+
+| Skill | 能力 | 数据来源 |
+|---|---|---|
+| `wechat-search` | 按关键词搜索文章、发现公众号 | 本地索引 + 搜狗微信搜索 |
+| `wechat-article` | 从原始链接读取正文与元数据 | `mp.weixin.qq.com` |
+| `wechat-subscribe` | 保存订阅、手动同步、查看健康状态 | RSS 2.0 / Atom / JSON Feed |
+
+所有命令把结构化 JSON 写到 stdout，便于任何 Agent 或脚本稳定调用。
+
+## 30 秒上手
+
+安装后可以直接对 Agent 说：
+
+> 搜索最近关于 OpenAI 的微信公众号文章，并给出原文链接。
+
+> 阅读这篇微信文章，概括主要观点并保留来源信息。
+
+> 订阅这个 Atom 地址，然后同步一次并列出新增文章。
+
+也可以直接使用 CLI：
 
 ```bash
-# 在本地机器（有浏览器）
-wechat-spider login
-wechat-spider export-login
-# 复制输出的凭证字符串
+# 全网发现 + 本地结果
+wechat-agent search --type articles --query "OpenAI" --scope hybrid --limit 10 --json
 
-# 在无头服务器上
-wechat-spider import-login "粘贴凭证字符串"
-wechat-spider status  # 验证登录成功
+# 读取微信原文
+wechat-agent read --url "https://mp.weixin.qq.com/s/..." --content full --json
+
+# 持久订阅一个明确的 Feed；更新只在 sync 时发生
+wechat-agent subscribe --feed-url "https://example.com/wechat.xml" --label "我的订阅" --json
+wechat-agent sync --json
+wechat-agent list --json
 ```
 
-## 命令参考
-
-| 命令 | 说明 |
-|------|------|
-| `status` | 检查登录状态 |
-| `login` | 扫码登录微信公众平台 |
-| `search <query>` | 搜索公众号 |
-| `scrape <account>` | 爬取单个公众号文章 |
-| `batch <accounts>` | 批量爬取（逗号分隔） |
-| `install-skill` | 部署 Skill 到 Claude Code / OpenClaw |
-| `export-login` | 导出登录凭证（用于无头服务器） |
-| `import-login <data>` | 导入登录凭证 |
-
-### scrape 参数
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--pages` | 最大页数（每页 5 篇） | 5 |
-| `--days` | 时间范围（最近 N 天） | 30 |
-| `--content` | 获取文章正文 | False |
-| `--interval` | 请求间隔（秒） | 5 |
-| `--output` | 输出 CSV 文件路径 | - |
-
-### batch 参数
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `--pages` | 每号最大页数 | 3 |
-| `--days` | 时间范围 | 30 |
-| `--content` | 获取正文 | False |
-| `--interval` | 请求间隔（秒） | 10 |
-| `--output-dir` | 输出目录 | ~/WeChatSpider |
-
-## 输出格式
-
-所有命令输出 JSON：
-
-```json
-{
-  "success": true,
-  "data": {
-    "account": "极客公园",
-    "total": 10,
-    "articles": [
-      {
-        "title": "文章标题",
-        "publish_time": "2026-03-01 10:00:00",
-        "link": "https://mp.weixin.qq.com/s/...",
-        "content": "正文内容（Markdown，仅 --content 时）"
-      }
-    ]
-  }
-}
-```
-
-## 作为 Python 库使用
-
-```python
-from wechat_article_spider.spider.wechat.login import WeChatSpiderLogin
-from wechat_article_spider.spider.wechat.scraper import WeChatScraper
-
-login = WeChatSpiderLogin()
-if login.login():
-    scraper = WeChatScraper(login.get_token(), login.get_headers())
-    accounts = scraper.search_account("极客公园")
-    articles = scraper.get_account_articles("极客公园", accounts[0]["wpub_fakid"], max_pages=5)
-```
-
-## 注意事项
-
-1. 登录凭证有效期约 4-7 天，过期需重新扫码
-2. 请求间隔建议 >= 3 秒，避免被微信限制
-3. `--content` 会显著增加耗时，按需使用
-4. 日志输出到 stderr，JSON 结果输出到 stdout
-5. 仅用于学习和研究目的
-
----
-
-<a name="english"></a>
-
-**[中文](#简介)** | English
-
-## Introduction
-
-`wechat-article-spider` is a self-contained CLI tool for searching and scraping articles from WeChat Official Accounts (微信公众号). It interacts with the WeChat Official Account Platform API to search accounts, fetch article lists, and extract full article content in Markdown format. It also integrates as a Skill for Claude Code / OpenClaw.
-
-### Features
-
-- QR code login with automatic credential caching (~4 days)
-- Search official accounts by name
-- Single / batch article scraping
-- Full content extraction to Markdown (images, videos, etc.)
-- Structured JSON output for tool integration
-- One-command deployment as Claude Code / OpenClaw Skill
-
-## Installation
+如果没有全局命令，Skills 会回退到固定版本的 `npx` 调用。查看完整命令：
 
 ```bash
-# From GitHub
-pip install git+https://github.com/qbu11/wechat-article-spider.git
-
-# Or clone and install locally
-git clone https://github.com/qbu11/wechat-article-spider.git
-pip install ./wechat-article-spider
+npx @qbu11/wechat-agent-kit --help
 ```
 
-### Requirements
+## 订阅边界
 
-- Python >= 3.8
-- Chrome browser (required for login)
+微信公众号没有面向此用途的稳定公开订阅接口。因此，本项目只持久订阅你明确提供、并经过内容验证的 RSS 2.0、Atom 或 JSON Feed 地址。搜索到的公众号名称或 ID **不会**被猜测成订阅源。
 
-### Deploy as Claude Code / OpenClaw Skill (optional)
+- `search --scope global` 依赖搜狗微信搜索，可能遇到验证码、限流或结果变化；工具会明确报错，不绕过访问控制。
+- `read` 支持公开的微信原文链接；已删除、受限或需验证的页面会返回对应状态。
+- `sync` 是显式操作。需要定时更新时，请让你信任的外部调度器调用固定的 `wechat-agent sync --json`。
+- Feed 的覆盖范围和延迟由 Feed 提供方决定，本项目不声称完整收录某个公众号。
+
+## 本地与安全
+
+- 文章和订阅保存在操作系统应用数据目录的单个 `wechat-agent.sqlite` 中；可用 `WECHAT_AGENT_DATA_DIR` 改变位置。
+- 网络访问拒绝私网目标、危险重定向和超大响应；文章、Feed 与搜索内容始终按不可信输入处理。
+- 安装器只管理自己写入且未被用户修改的文件；覆盖前会备份，卸载不会删除已修改内容。
+- 不在日志或结果中输出 Cookie、浏览器配置与认证头。
+
+详见 [安全策略](SECURITY.md)、[隐私说明](PRIVACY.md) 与 [架构说明](docs/architecture.md)。
+
+## 开发
 
 ```bash
-wechat-spider install-skill
+npm ci
+npm run validate
+npm run build
+npm run pack:check
 ```
 
-This deploys SKILL.md to the following paths:
+仓库保留了原来的 Python `wechat-spider`，用于需要扫码登录微信公众平台后台的旧流程；它不是新 Agent Skills 的运行依赖。迁移和凭证注意事项见 [Python 旧版说明](docs/legacy-python.md)。
 
-| Platform | Deployment Path |
-|----------|-----------------|
-| Claude Code | `~/.claude/skills/wechat-article-spider/SKILL.md` |
-| OpenClaw | `~/.openclaw/skills/wechat-article-spider/SKILL.md` |
-
-After deployment, trigger it via `/wechat-article-spider`.
-
-## Quick Start
-
-### Two Search Modes
-
-This tool supports two search modes:
-
-1. **Search by Account Name**: When you know the specific account name, use CLI directly
-2. **Search by Article Keywords**: When you want to search articles across accounts, use Sogou WeChat Search with Chrome DevTools MCP
-
-**Auto-detection**: Run `wechat-spider search "keyword"` first. If returned accounts are irrelevant, switch to Sogou search mode.
-
-### Natural Language Usage Guide (Recommended)
-
-If you're using this tool in Claude Code / OpenClaw, just describe your needs in natural language. Claude will automatically invoke the appropriate commands.
-
-**Examples:**
-
-```
-# Search related
-"Help me search for the GeekPark official account"
-"Find recent posts from Tech Aesthetics"
-
-# Scrape articles
-"Get articles from GeekPark from the last 7 days"
-"Help me scrape Huxiu's articles from the last 30 days, including full content"
-"Fetch all articles from 36Kr from the past week and save to CSV"
-
-# Batch operations
-"Help me batch scrape articles from the last 3 days from GeekPark, iFanr, and Synced"
-"Get recent AI-related articles from mainstream tech media (GeekPark, iFanr, Synced)"
-
-# Status check
-"Check my login status"
-"I need to re-login to WeChat"
-```
-
-Claude will automatically select the appropriate commands and parameters based on your needs—no need to memorize CLI syntax.
-
-### CLI Quick Start
-
-If you're using the command line directly, here are the common commands:
-
-```bash
-# 1. Login (first time, requires WeChat QR scan)
-wechat-spider login
-
-# 2. Check login status
-wechat-spider status
-
-# 3. Search for an account
-wechat-spider search "极客公园"
-
-# 4. Scrape articles (titles + links only)
-wechat-spider scrape "极客公园" --pages 5 --days 30
-
-# 5. Scrape with full content
-wechat-spider scrape "极客公园" --pages 5 --days 30 --content
-
-# 6. Save to CSV
-wechat-spider scrape "极客公园" --pages 5 --days 30 --content --output result.csv
-
-# 7. Batch scrape multiple accounts
-wechat-spider batch "极客公园,爱范儿,机器之心" --pages 3 --days 7 --content
-
-# 8. Export credentials (for headless servers)
-wechat-spider export-login
-
-# 9. Import credentials on headless server
-wechat-spider import-login "exported-credential-string"
-```
-
-### Headless Server Deployment
-
-For servers without a browser, export credentials from a local machine first:
-
-```bash
-# On local machine (with browser)
-wechat-spider login
-wechat-spider export-login
-# Copy the credential string
-
-# On headless server
-wechat-spider import-login "paste-credential-string"
-wechat-spider status  # Verify login success
-```
-
-## Command Reference
-
-| Command | Description |
-|---------|-------------|
-| `status` | Check login status |
-| `login` | Login via WeChat QR code |
-| `search <query>` | Search official accounts |
-| `scrape <account>` | Scrape a single account |
-| `batch <accounts>` | Batch scrape (comma-separated) |
-| `install-skill` | Deploy Skill to Claude Code / OpenClaw |
-| `export-login` | Export credentials (for headless servers) |
-| `import-login <data>` | Import credentials |
-
-### scrape options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--pages` | Max pages (5 articles/page) | 5 |
-| `--days` | Time range (last N days) | 30 |
-| `--content` | Fetch article body | False |
-| `--interval` | Request interval (seconds) | 5 |
-| `--output` | Output CSV file path | - |
-
-### batch options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--pages` | Max pages per account | 3 |
-| `--days` | Time range | 30 |
-| `--content` | Fetch article body | False |
-| `--interval` | Request interval (seconds) | 10 |
-| `--output-dir` | Output directory | ~/WeChatSpider |
-
-## Output Format
-
-All commands output JSON:
-
-```json
-{
-  "success": true,
-  "data": {
-    "account": "极客公园",
-    "total": 10,
-    "articles": [
-      {
-        "title": "Article Title",
-        "publish_time": "2026-03-01 10:00:00",
-        "link": "https://mp.weixin.qq.com/s/...",
-        "content": "Article body in Markdown (only with --content)"
-      }
-    ]
-  }
-}
-```
-
-## Use as Python Library
-
-```python
-from wechat_article_spider.spider.wechat.login import WeChatSpiderLogin
-from wechat_article_spider.spider.wechat.scraper import WeChatScraper
-
-login = WeChatSpiderLogin()
-if login.login():
-    scraper = WeChatScraper(login.get_token(), login.get_headers())
-    accounts = scraper.search_account("极客公园")
-    articles = scraper.get_account_articles("极客公园", accounts[0]["wpub_fakid"], max_pages=5)
-```
-
-## Notes
-
-1. Login credentials expire in ~4-7 days; re-scan when expired
-2. Keep request interval >= 3 seconds to avoid rate limiting
-3. `--content` significantly increases scrape time; use only when needed
-4. Logs go to stderr, JSON results go to stdout
-5. For educational and research purposes only
-
-## Acknowledgments / 致谢
-
-This project is based on [WeMediaSpider](https://github.com/nicekate/WeMediaSpider), refactored into a self-contained pip-installable CLI tool. Thanks to the original contributors.
-
-本项目基于 [WeMediaSpider](https://github.com/nicekate/WeMediaSpider) 重构为自包含的 pip 可安装 CLI 工具，感谢原项目贡献者。
-
-## License
-
-MIT (see [LICENSE](LICENSE)) — includes original WeMediaSpider copyright.
+欢迎阅读 [贡献指南](CONTRIBUTING.md)。本项目基于 [MIT License](LICENSE) 开源，仅用于合法、合规的内容检索与个人信息管理；请遵守来源站点条款与著作权规则。

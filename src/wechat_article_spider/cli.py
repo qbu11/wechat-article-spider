@@ -292,14 +292,12 @@ def cmd_install_skill(args):
     from pathlib import Path
     import shutil
 
-    # 优先从包内 skill_data/ 找（pip install 后的标准路径）
-    skill_src = Path(__file__).resolve().parent / "skill_data" / "SKILL.md"
-    if not skill_src.exists():
-        # 开发模式：从项目根目录的 skill/ 找
-        pkg_dir = Path(__file__).resolve().parent.parent.parent
-        skill_src = pkg_dir / "skill" / "SKILL.md"
-    if not skill_src.exists():
-        skill_src = pkg_dir.parent / "skill" / "SKILL.md"
+    skill_src = (
+        Path(__file__).resolve().parent
+        / "skill_data"
+        / "wechat-article-spider"
+        / "SKILL.md"
+    )
 
     if not skill_src.exists():
         _print_json({"success": False, "error": "找不到 SKILL.md，请确认包完整性"})
@@ -344,8 +342,11 @@ def cmd_install_skill(args):
 
 
 def cmd_export_login(args):
-    """导出登录凭证为可分享字符串"""
-    from wechat_article_spider.spider.wechat.cache_codec import encode_cache_file
+    """旧版不加密凭证迁移；默认拒绝，必须显式确认风险。"""
+    from wechat_article_spider.spider.wechat.cache_codec import (
+        INSECURE_EXPORT_WARNING,
+        encode_cache_file,
+    )
     from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
 
     cache_file = get_wechat_cache_file()
@@ -354,11 +355,14 @@ def cmd_export_login(args):
         return 1
 
     try:
-        encoded = encode_cache_file(cache_file)
+        encoded = encode_cache_file(
+            cache_file,
+            allow_insecure=args.i_understand_this_is_not_encrypted,
+        )
         _print_json({
             "success": True,
             "data": {
-                "message": "登录凭证已导出，请复制下方字符串到目标机器执行 import-login",
+                "message": f"旧版迁移凭证已导出。{INSECURE_EXPORT_WARNING}",
                 "encoded": encoded
             }
         })
@@ -442,11 +446,18 @@ def main():
     # install-skill
     subparsers.add_parser("install-skill", help="安装 Skill 文档到 Claude Code / OpenClaw")
 
-    # export-login
-    subparsers.add_parser("export-login", help="导出登录凭证（用于复制到服务器）")
+    # export-login（兼容旧工作流，但默认拒绝不加密导出）
+    sp_export = subparsers.add_parser(
+        "export-login", help="旧版不加密凭证迁移（默认关闭，建议重新扫码）"
+    )
+    sp_export.add_argument(
+        "--i-understand-this-is-not-encrypted",
+        action="store_true",
+        help="确认输出包含完整 token/cookies，泄露后可被接管",
+    )
 
     # import-login
-    sp_import = subparsers.add_parser("import-login", help="导入登录凭证（从其他机器复制）")
+    sp_import = subparsers.add_parser("import-login", help="兼容导入旧版 WC01 凭证")
     sp_import.add_argument("token_string", help="export-login 导出的编码字符串")
 
     args = parser.parse_args()

@@ -8,7 +8,7 @@
 使用 DrissionPage 替代 Selenium，支持：
     - 接管已打开的 Chrome 浏览器（通过 9222 端口）
     - 创建新的 Chrome 浏览器并暴露调试端口
-    - 与 Chrome DevTools MCP 共享浏览器实例
+    - 复用本机已打开的调试浏览器实例
 
 工作流程:
     1. 优先接管已存在的 Chrome（9222 端口）
@@ -24,7 +24,7 @@
 
 优势:
     - 无需下载 chromedriver（版本无关）
-    - 可与 Chrome DevTools MCP 共享浏览器
+    - 可复用已有浏览器会话
     - 性能更好，启动更快
     - 代码更简洁
 
@@ -37,10 +37,8 @@ import json
 import os
 import random
 import time
-import platform
 import tempfile
 import shutil
-import subprocess
 import re
 from datetime import datetime, timedelta
 from urllib.parse import parse_qs, urlparse
@@ -49,7 +47,11 @@ from DrissionPage import ChromiumPage, ChromiumOptions
 import requests
 
 from wechat_article_spider.spider.log.utils import logger
-from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
+from wechat_article_spider.spider.wechat.paths import (
+    get_wechat_cache_file,
+    harden_private_file,
+    secure_json_write,
+)
 
 # 缓存文件路径（存储在用户数据目录）
 CACHE_FILE = get_wechat_cache_file()
@@ -57,7 +59,7 @@ CACHE_FILE = get_wechat_cache_file()
 # 缓存有效期：4 天（微信 token 一般 4-7 天过期）
 CACHE_EXPIRE_HOURS = 24 * 4
 
-# Chrome 调试端口（与 Chrome DevTools MCP 共享）
+# Chrome 本地调试端口
 CHROME_DEBUG_PORT = 9222
 
 
@@ -93,7 +95,7 @@ class WeChatSpiderLogin:
 
     负责处理登录认证的完整生命周期，包括：
     - 缓存的读取、验证和保存
-    - 浏览器的接管或创建（支持与 MCP 共享）
+    - 浏览器的接管或创建
     - 登录流程的执行和监控
     - 资源的清理和释放
 
@@ -120,7 +122,7 @@ class WeChatSpiderLogin:
 
         Args:
             cache_file: 缓存文件路径，默认使用用户数据目录下的文件
-            debug_port: Chrome 调试端口，默认 9222（与 MCP 共享）
+            debug_port: Chrome 本地调试端口，默认 9222
         """
         self.token = None
         self.cookies = None
@@ -140,8 +142,7 @@ class WeChatSpiderLogin:
                 'timestamp': datetime.now().timestamp()
             }
             try:
-                with open(self.cache_file, 'w', encoding='utf-8') as f:
-                    json.dump(cache_data, f, ensure_ascii=False, indent=2)
+                secure_json_write(self.cache_file, cache_data)
                 logger.success(f"登录信息已保存到缓存文件 {self.cache_file}")
                 return True
             except Exception as e:
@@ -156,6 +157,7 @@ class WeChatSpiderLogin:
             return False
 
         try:
+            harden_private_file(self.cache_file)
             with open(self.cache_file, 'r', encoding='utf-8') as f:
                 cache_data = json.load(f)
 
@@ -262,9 +264,8 @@ class WeChatSpiderLogin:
 
         设置各种 Chrome 参数以优化爬虫场景下的表现：
         - 使用临时用户数据目录，避免影响用户的 Chrome 配置
-        - 暴露调试端口，让 Chrome DevTools MCP 可以连接
+        - 仅在 loopback 暴露调试端口
         - 禁用不必要的功能以提升性能
-        - 隐藏自动化特征以降低被检测风险
 
         Returns:
             ChromiumOptions: 配置好的选项对象
@@ -275,9 +276,9 @@ class WeChatSpiderLogin:
         self.temp_user_data_dir = tempfile.mkdtemp()
         co.set_user_data_path(self.temp_user_data_dir)
 
-        # 设置调试端口（关键：让 MCP 可以连接）
+        # 设置 loopback 调试端口，供本进程创建或接管浏览器
         co.set_local_port(self.debug_port)
-        co.set_argument('--remote-allow-origins=*')
+        co.set_argument('--remote-debugging-address=127.0.0.1')
 
         # 性能优化
         co.no_imgs(True)  # 不加载图片（可选，提升速度）
@@ -285,14 +286,10 @@ class WeChatSpiderLogin:
         co.set_argument('--disable-plugins')
         co.set_argument('--disable-software-rasterizer')
         co.set_argument('--disable-gpu')
-        co.set_argument('--no-sandbox')
         co.set_argument('--disable-dev-shm-usage')
 
         # 页面缩放
         co.set_argument('--force-device-scale-factor=0.9')
-
-        # 隐藏自动化特征
-        co.set_argument('--disable-blink-features=AutomationControlled')
 
         # 自定义用户代理
         co.set_user_agent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36')
@@ -333,26 +330,14 @@ class WeChatSpiderLogin:
             return None
 
     def _cleanup_chrome_processes(self):
-        """
-        清理 Chrome 进程（仅当由本实例创建时）
+        """Deprecated compatibility hook; never terminate Chrome by name.
 
-        注意：如果有其他程序（如 MCP）正在使用浏览器，不应该强制关闭
+        ``page.quit()`` is the only supported process cleanup and is called only
+        for a page created by this instance. Killing by executable name can
+        destroy unrelated user sessions, so this hook intentionally does
+        nothing.
         """
-        if not self._created_browser:
-            logger.debug("浏览器非本实例创建，跳过进程清理")
-            return
-
-        try:
-            system = platform.system()
-            if system == "Windows":
-                subprocess.run(["taskkill", "/F", "/IM", "chrome.exe", "/T"],
-                              stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            elif system in ("Linux", "Darwin"):
-                subprocess.run(["pkill", "-f", "chrome"],
-                              stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
-            logger.debug("残留浏览器进程已清理")
-        except Exception as e:
-            logger.warning(f"清理Chrome进程时出现警告: {e}")
+        logger.debug("跳过全局 Chrome 进程清理；仅管理本实例创建的页面")
 
     def _cleanup_temp_files(self):
         """清理临时用户数据目录（仅当由本实例创建时）"""
@@ -435,16 +420,19 @@ class WeChatSpiderLogin:
             return False
 
         finally:
-            # 关闭浏览器（仅当由本实例创建时）
+            # 关闭浏览器（仅当由本实例创建时）。不要按进程名全局清理。
+            browser_closed = not self._created_browser
             if self.page and self._created_browser:
                 try:
                     self.page.quit()
+                    browser_closed = True
                     logger.debug("浏览器已关闭")
-                except:
-                    pass
+                except Exception as exc:
+                    logger.warning(f"关闭本实例浏览器失败，保留 profile 以避免破坏运行中进程: {exc}")
 
             self._cleanup_chrome_processes()
-            self._cleanup_temp_files()
+            if browser_closed:
+                self._cleanup_temp_files()
 
     def check_login_status(self):
         """获取当前登录状态的详细信息"""

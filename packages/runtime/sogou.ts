@@ -1,0 +1,89 @@
+import { load } from "cheerio";
+import { createStableId, type Article, type ArticleSource } from "../core/index.js";
+import { safeFetchText } from "./http.js";
+
+export interface SogouResult {
+  article: Article;
+  source: ArticleSource;
+}
+
+function normalizeIdentityPart(value: string): string {
+  return value.replaceAll(/\s+/g, " ").trim().normalize("NFC").toLocaleLowerCase();
+}
+
+/** Parse Sogou markup without making a network request. */
+export function parseSogouResults(
+  html: string,
+  options: { limit?: number; now?: Date } = {},
+): SogouResult[] {
+  const $ = load(html);
+  const now = (options.now ?? new Date()).toISOString();
+  const limit = Math.max(1, Math.min(options.limit ?? 10, 100));
+  const results: SogouResult[] = [];
+  $("ul.news-list li").each((_, element) => {
+    if (results.length >= limit) return;
+    const anchor = $(element).find(".txt-box h3 a").first();
+    const href = anchor.attr("href");
+    const title = anchor.text().replaceAll(/\s+/g, " ").trim();
+    if (!href || !title) return;
+    const sourceUrl = new URL(href, "https://weixin.sogou.com").href;
+    const accountName = $(element).find(".s-p .all-time-y2, .account").first().text().trim();
+    const summary = $(element).find(".txt-info").first().text().replaceAll(/\s+/g, " ").trim();
+    const publication = $(element).find("time, .s-p .s2, .s-p .time, .s2").first();
+    const rawPublication = [
+      publication.attr("datetime"),
+      publication.attr("data-time"),
+      publication.text(),
+      publication.html(),
+    ]
+      .filter((value): value is string => Boolean(value))
+      .join(" ");
+    const unixTimestamp = rawPublication.match(/timeConvert\(\s*['\"]?(\d{8,})/i)?.[1];
+    const explicitPublication = unixTimestamp ?? publication.attr("datetime") ?? publication.attr("data-time") ?? "";
+    const publicationHint = normalizeIdentityPart(explicitPublication);
+    const stableParts = [
+      normalizeIdentityPart(accountName),
+      normalizeIdentityPart(title),
+      publicationHint || normalizeIdentityPart(summary),
+    ];
+    const id = createStableId("article", "sogou", ...stableParts);
+    results.push({
+      article: {
+        id,
+        title,
+        ...(summary ? { summary } : {}),
+        canonicalUrl: sourceUrl,
+        createdAt: now,
+        updatedAt: now,
+        metadata: {
+          accountName,
+          discoveryOnly: true,
+          ...(publicationHint ? { publicationHint } : {}),
+        },
+      },
+      source: {
+        id: createStableId("source", "sogou", ...stableParts),
+        articleId: id,
+        connectorId: "sogou",
+        connectorKind: "sogou",
+        sourceUrl,
+        discoveredAt: now,
+        metadata: { accountName, ...(publicationHint ? { publicationHint } : {}) },
+      },
+    });
+  });
+  return results;
+}
+
+export async function searchSogou(query: string, limit = 10): Promise<SogouResult[]> {
+  const url = new URL("https://weixin.sogou.com/weixin");
+  url.searchParams.set("type", "2");
+  url.searchParams.set("query", query);
+  url.searchParams.set("ie", "utf8");
+  const response = await safeFetchText(url.href, { allowedHosts: new Set(["weixin.sogou.com"]), maxBytes: 3 * 1024 * 1024 });
+  if (response.status !== 200) throw new Error(`Sogou WeChat search returned HTTP ${response.status}`);
+  if (/请输入验证码|antispider|访问过于频繁/.test(response.body)) {
+    throw new Error("Sogou requires browser verification. Complete the captcha manually and retry later.");
+  }
+  return parseSogouResults(response.body, { limit });
+}

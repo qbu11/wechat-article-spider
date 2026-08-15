@@ -1,0 +1,80 @@
+{
+  "name": "@qbu11/wechat-agent-kit",
+  "version": "0.1.0",
+  "description": "Local-first WeChat Official Account search, reading, and subscription tools for AI agents.",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "qbu11",
+    "url": "https://github.com/qbu11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qbu11/wechat-article-spider.git"
+  },
+  "homepage": "https://github.com/qbu11/wechat-article-spider#readme",
+  "bugs": {
+    "url": "https://github.com/qbu11/wechat-article-spider/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "keywords": [
+    "wechat",
+    "agent-skills",
+    "cli",
+    "rss",
+    "subscription"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "bin": {
+    "wechat-agent-kit": "./dist/packages/cli/cli.js",
+    "wechat-agent": "./dist/packages/cli/cli.js",
+    "wechat-skills": "./dist/packages/cli/cli.js"
+  },
+  "exports": {
+    ".": "./dist/packages/core/index.js"
+  },
+  "files": [
+    "dist/packages/",
+    "skills/",
+    ".codex-plugin/",
+    ".claude-plugin/",
+    "agents/",
+    "assets/plugin/",
+    "assets/hero-light.svg",
+    "assets/hero-dark.svg",
+    "docs/",
+    "README.md",
+    "README.en.md",
+    "SECURITY.md",
+    "PRIVACY.md",
+    "CONTRIBUTING.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate:skills": "node scripts/validate-skills.mjs",
+    "validate:plugin": "node scripts/validate-plugins.mjs",
+    "validate": "npm run typecheck && npm test && npm run validate:skills && npm run validate:plugin",
+    "prepare": "npm run build",
+    "prepack": "npm run build && npm run validate",
+    "pack:check": "npm pack --dry-run"
+  },
+  "dependencies": {
+    "cheerio": "1.2.0",
+    "fast-xml-parser": "5.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "tsx": "4.23.12",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

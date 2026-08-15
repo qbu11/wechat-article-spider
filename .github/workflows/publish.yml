@@ -1,0 +1,41 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    name: Verify and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out released source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js for npm Trusted Publishing
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Require the release tag to match package.json
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: test "v$(node -p "require('./package.json').version")" = "$RELEASE_TAG"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate and build
+        run: |
+          npm run validate
+          npm run build
+
+      - name: Publish public package with OIDC provenance
+        run: npm publish --access public

@@ -1,4 +1,6 @@
 __pycache__/
+node_modules/
+.pytest_cache/
 *.py[cod]
 *.egg-info/
 *.egg

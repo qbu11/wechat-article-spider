@@ -1,0 +1,42 @@
+{
+  "name": "wechat-agent-kit",
+  "version": "0.1.0",
+  "description": "Search and read WeChat Official Account articles, and synchronize verified feed subscriptions through local-first Agent Skills and a JSON CLI.",
+  "author": {
+    "name": "qbu11",
+    "url": "https://github.com/qbu11"
+  },
+  "homepage": "https://github.com/qbu11/wechat-article-spider",
+  "repository": "https://github.com/qbu11/wechat-article-spider",
+  "license": "MIT",
+  "keywords": [
+    "wechat",
+    "official-accounts",
+    "agent-skills",
+    "cli",
+    "subscriptions"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "WeChat Agent Kit",
+    "shortDescription": "Search, read, and sync verified WeChat feeds",
+    "longDescription": "Give agents a local-first, provenance-aware CLI workflow to search and read WeChat Official Account articles, manage verified RSS, Atom, and JSON Feed subscriptions, explicitly synchronize new posts, and surface source degradation safely.",
+    "developerName": "qbu11",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/qbu11/wechat-article-spider",
+    "defaultPrompt": [
+      "Search WeChat for recent articles about AI agents",
+      "Read and summarize this WeChat article",
+      "Subscribe to this HTTPS RSS, Atom, or JSON Feed URL"
+    ],
+    "brandColor": "#16A34A",
+    "composerIcon": "./assets/plugin/icon.svg",
+    "logo": "./assets/plugin/logo.svg",
+    "screenshots": []
+  }
+}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">WeChat Agent Kit</title>
+  <defs>
+    <linearGradient id="g" x1="8" y1="7" x2="55" y2="57" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4ADE80"/>
+      <stop offset="1" stop-color="#15803D"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#07130B"/>
+  <path d="M11 27c0-9.4 8.7-17 19.5-17S50 17.6 50 27 41.3 44 30.5 44c-2.5 0-4.9-.4-7.1-1.1L15 47l2.8-7.4C13.6 36.5 11 32 11 27Z" fill="url(#g)"/>
+  <path d="M27 38c0-7.2 6.7-13 15-13s15 5.8 15 13-6.7 13-15 13c-1.8 0-3.6-.3-5.2-.8L30 54l2.1-6c-3.2-2.4-5.1-6-5.1-10Z" fill="#ECFDF5" stroke="#07130B" stroke-width="2"/>
+  <circle cx="24" cy="26" r="2.2" fill="#07130B"/>
+  <circle cx="37" cy="26" r="2.2" fill="#07130B"/>
+  <circle cx="38" cy="38" r="1.9" fill="#15803D"/>
+  <circle cx="48" cy="38" r="1.9" fill="#15803D"/>
+</svg>

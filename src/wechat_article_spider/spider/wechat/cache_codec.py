@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-登录凭证编解码模块
-==================
+旧版登录凭证迁移模块
+====================
 
-实现登录信息（token + cookies）的编码和解码功能，
-用于在用户之间分享登录凭证，避免重复扫码登录。
+兼容读取旧版 ``WC01`` 登录凭证。WC01 只有压缩、CRC 和 Base64，
+不提供加密或机密性，不应被当作安全导出格式。
 
-应用场景:
-    - 团队成员共享登录状态
-    - 在不同设备间迁移登录信息
-    - 备份和恢复登录凭证
+新代码不应生成或分享这种字符串；请在目标机器重新扫码登录。
+CLI 导出默认关闭，仅保留带明确风险确认的临时迁移入口。
 
 编码流程:
     JSON 序列化 -> zlib 压缩 -> CRC32 校验 -> Base64 编码 -> 添加版本前缀
@@ -19,9 +17,9 @@
     验证前缀 -> Base64 解码 -> CRC32 校验 -> zlib 解压 -> JSON 反序列化
 
 安全说明:
-    - 编码后的字符串包含完整的登录凭证，请妥善保管
+    - 编码后的字符串包含完整的登录凭证，泄露效果等同明文
     - 凭证有时效性，过期后需要重新获取
-    - 建议仅在可信环境中分享
+    - 不建议分享；迁移时应在目标机器重新扫码登录
 
 技术规格:
     - 压缩: zlib DEFLATE (level=9)
@@ -42,7 +40,11 @@ from datetime import datetime
 from wechat_article_spider.spider.log.utils import logger
 
 # 导入路径工具函数
-from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
+from wechat_article_spider.spider.wechat.paths import (
+    get_wechat_cache_file,
+    harden_private_file,
+    secure_json_write,
+)
 
 # ============================================================================
 # 常量定义
@@ -52,6 +54,10 @@ from wechat_article_spider.spider.wechat.paths import get_wechat_cache_file
 # 格式: WC + 版本号 (2位)
 # WC = WeChat Cache
 CODEC_VERSION_PREFIX = "WC01"
+INSECURE_EXPORT_WARNING = (
+    "WC01 仅为 Base64 编码，不是加密；字符串包含完整 token 和 cookies。"
+    "推荐在目标机器重新扫码登录。"
+)
 
 # 默认缓存文件路径（使用用户数据目录，避免权限问题）
 DEFAULT_CACHE_FILE = get_wechat_cache_file()
@@ -101,9 +107,11 @@ class VersionError(DecodeError):
 # 核心编解码函数
 # ============================================================================
 
-def encode_cache_data(data: Dict[str, Any]) -> str:
+def encode_cache_data(
+    data: Dict[str, Any], *, allow_insecure: bool = False
+) -> str:
     """
-    将缓存数据编码为可分享的字符串
+    将缓存数据编码为旧版 WC01 字符串（不加密）。
     
     编码算法流程:
         1. JSON 序列化 -> UTF-8 字节流
@@ -115,6 +123,7 @@ def encode_cache_data(data: Dict[str, Any]) -> str:
     
     Args:
         data: 缓存数据字典，必须包含 token, cookies, timestamp 字段
+        allow_insecure: 必须显式为 True，确认调用者理解结果未加密
         
     Returns:
         str: 编码后的字符串，格式为 "WC01" + Base64编码数据
@@ -125,9 +134,12 @@ def encode_cache_data(data: Dict[str, Any]) -> str:
         
     Example:
         >>> data = {"token": "123", "cookies": {...}, "timestamp": 1234567890.0}
-        >>> encoded = encode_cache_data(data)
+        >>> encoded = encode_cache_data(data, allow_insecure=True)
         >>> print(encoded[:4])  # 输出: WC01
     """
+    if not allow_insecure:
+        raise EncodeError(f"不安全的凭证导出默认关闭。{INSECURE_EXPORT_WARNING}")
+
     try:
         # 步骤1: 验证输入数据结构
         _validate_cache_data(data)
@@ -401,9 +413,14 @@ def validate_encoded_string(encoded_str: str) -> Tuple[bool, str]:
 # 文件操作函数
 # ============================================================================
 
-def encode_cache_file(cache_file: str = DEFAULT_CACHE_FILE) -> str:
+def encode_cache_file(
+    cache_file: str = DEFAULT_CACHE_FILE, *, allow_insecure: bool = False
+) -> str:
     """
-    读取缓存文件并编码为分享字符串
+    读取缓存文件并编码为旧版迁移字符串。
+
+    默认拒绝导出，调用者必须明确传入 ``allow_insecure=True``。WC01
+    不加密，输出等同于明文凭证，不适合聊天、工单或日志传输。
     
     Args:
         cache_file: 缓存文件路径，默认为 'wechat_cache.json'
@@ -416,15 +433,19 @@ def encode_cache_file(cache_file: str = DEFAULT_CACHE_FILE) -> str:
         EncodeError: 编码失败
         ValidationError: 数据验证失败
     """
+    if not allow_insecure:
+        raise EncodeError(f"不安全的凭证导出默认关闭。{INSECURE_EXPORT_WARNING}")
+
     if not os.path.exists(cache_file):
         raise FileNotFoundError(f"缓存文件不存在: {cache_file}")
     
     try:
+        harden_private_file(cache_file)
         with open(cache_file, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
         logger.info(f"已读取缓存文件: {cache_file}")
-        return encode_cache_data(data)
+        return encode_cache_data(data, allow_insecure=True)
         
     except json.JSONDecodeError as e:
         raise EncodeError(f"缓存文件 JSON 格式错误: {str(e)}")
@@ -457,16 +478,15 @@ def decode_to_cache_file(encoded_str: str, cache_file: str = DEFAULT_CACHE_FILE,
     if backup and os.path.exists(cache_file):
         backup_file = f"{cache_file}.backup"
         try:
-            import shutil
-            shutil.copy2(cache_file, backup_file)
+            with open(cache_file, 'r', encoding='utf-8') as source:
+                secure_json_write(backup_file, json.load(source))
             logger.info(f"已备份原缓存文件到: {backup_file}")
         except Exception as e:
             logger.warning(f"备份缓存文件失败: {e}")
     
     # 写入新数据
     try:
-        with open(cache_file, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+        secure_json_write(cache_file, data)
         
         logger.success(f"缓存数据已写入: {cache_file}")
         return data
@@ -557,9 +577,14 @@ def main():
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
     
     # 编码命令
-    encode_parser = subparsers.add_parser('encode', help='编码缓存文件')
+    encode_parser = subparsers.add_parser('encode', help='旧版不加密导出（不推荐）')
     encode_parser.add_argument('-f', '--file', default=DEFAULT_CACHE_FILE,
                                help=f'缓存文件路径 (默认: {DEFAULT_CACHE_FILE})')
+    encode_parser.add_argument(
+        '--i-understand-this-is-not-encrypted',
+        action='store_true',
+        help='确认输出包含完整明文等价凭证',
+    )
     
     # 解码命令
     decode_parser = subparsers.add_parser('decode', help='解码字符串')
@@ -577,7 +602,10 @@ def main():
     
     if args.command == 'encode':
         try:
-            result = encode_cache_file(args.file)
+            result = encode_cache_file(
+                args.file,
+                allow_insecure=args.i_understand_this_is_not_encrypted,
+            )
             print("\n编码成功！")
             print(f"字符串长度: {len(result)} 字符")
             print("\n" + "=" * 60)

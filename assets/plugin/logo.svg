@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-labelledby="title desc">
+  <title id="title">WeChat Agent Kit</title>
+  <desc id="desc">Green overlapping message bubbles and the WeChat Agent Kit wordmark</desc>
+  <rect width="320" height="96" rx="24" fill="#07130B"/>
+  <g transform="translate(16 16) scale(.98)">
+    <path d="M4 28C4 15.8 14.8 6 28 6s24 9.8 24 22-10.8 22-24 22c-3 0-6-.5-8.6-1.4L9 54l3.4-9.5C7.2 40.5 4 34.6 4 28Z" fill="#22C55E"/>
+    <path d="M25 42c0-9.4 8.7-17 19.5-17S64 32.6 64 42 55.3 59 44.5 59c-2.4 0-4.7-.4-6.8-1.1L29 63l2.8-7.8A16.5 16.5 0 0 1 25 42Z" fill="#ECFDF5" stroke="#07130B" stroke-width="2"/>
+    <circle cx="20" cy="27" r="2.4" fill="#07130B"/>
+    <circle cx="35" cy="27" r="2.4" fill="#07130B"/>
+    <circle cx="40" cy="41" r="2.1" fill="#15803D"/>
+    <circle cx="52" cy="41" r="2.1" fill="#15803D"/>
+  </g>
+  <text x="94" y="45" fill="#F0FDF4" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="25" font-weight="700" letter-spacing="-.4">WeChat Agent Kit</text>
+  <text x="95" y="67" fill="#86EFAC" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="500" letter-spacing="1.7">SEARCH · READ · SUBSCRIBE</text>
+</svg>
