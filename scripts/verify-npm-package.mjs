@@ -46,8 +46,22 @@ try {
   };
   for (const target of Object.values(expectedBins)) await access(join(root, target));
 
-  const dryRun = await npm1117(["publish", "--dry-run", "--ignore-scripts", "--access", "public"]);
-  const publishOutput = `${dryRun.stdout}\n${dryRun.stderr}`;
+  let publishOutput = "";
+  let publishedIntegrity;
+  try {
+    const dryRun = await npm1117(["publish", "--dry-run", "--ignore-scripts", "--access", "public"]);
+    publishOutput = `${dryRun.stdout}\n${dryRun.stderr}`;
+  } catch (error) {
+    publishOutput = error instanceof Error ? error.message : String(error);
+    if (!/cannot publish over (?:the )?previously published versions?/i.test(publishOutput)) throw error;
+
+    const packageSpec = `${packageJson.name}@${packageJson.version}`;
+    const registryResult = await npm1117(["view", packageSpec, "dist.integrity", "--json"]);
+    publishedIntegrity = JSON.parse(registryResult.stdout);
+    if (typeof publishedIntegrity !== "string" || !publishedIntegrity.startsWith("sha512-")) {
+      throw new Error(`registry did not return an integrity for ${packageSpec}: ${registryResult.stdout}`);
+    }
+  }
   if (/auto-corrected|script name .* invalid and removed|no bin file found/i.test(publishOutput)) {
     throw new Error(`npm ${pinnedNpm} changed or removed a bin during publish dry-run:\n${publishOutput}`);
   }
@@ -56,6 +70,11 @@ try {
   const packResult = JSON.parse(packed.stdout);
   const filename = packResult?.[0]?.filename;
   if (!filename) throw new Error(`npm pack did not return a tarball filename:\n${packed.stdout}${packed.stderr}`);
+  if (publishedIntegrity && packResult[0].integrity !== publishedIntegrity) {
+    throw new Error(
+      `published integrity ${publishedIntegrity} does not match local tarball ${packResult[0].integrity}`,
+    );
+  }
   const tarball = join(temporary, basename(filename));
 
   const installRoot = join(temporary, "installed");
@@ -112,7 +131,8 @@ try {
     throw new Error(`unexpected npx install dry-run output: ${installPlan.stdout}`);
   }
 
-  console.log(`npm ${pinnedNpm} publish dry-run and ${basename(tarball)} npx E2E passed.`);
+  const registryCheck = publishedIntegrity ? "published registry integrity" : "publish dry-run";
+  console.log(`npm ${pinnedNpm} ${registryCheck} and ${basename(tarball)} npx E2E passed.`);
 } finally {
   await rm(temporary, { recursive: true, force: true });
 }
