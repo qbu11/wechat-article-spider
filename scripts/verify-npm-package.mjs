@@ -3,10 +3,12 @@
 import { spawn } from "node:child_process";
 import { access, mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const npmRunner = process.platform === "win32" ? "npx.cmd" : "npx";
+const npmExecPath = process.env.npm_execpath;
+if (!npmExecPath) throw new Error("npm_execpath is unavailable; run this verifier through npm run verify:npm.");
+const npxCli = join(dirname(npmExecPath), "npx-cli.js");
 const pinnedNpm = "npm@11.17.0";
 const temporary = await mkdtemp(join(tmpdir(), "wechat-agent-npm-e2e-"));
 const npmCache = join(temporary, "npm-cache");
@@ -31,10 +33,11 @@ function run(command, args, options = {}) {
 }
 
 function npm1117(args, options) {
-  return run(npmRunner, ["--yes", "--package", pinnedNpm, "npm", ...args], options);
+  return run(process.execPath, [npxCli, "--yes", "--package", pinnedNpm, "npm", ...args], options);
 }
 
 try {
+  await access(npxCli);
   const packageJson = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
   const expectedBins = {
     "wechat-agent-kit": "dist/packages/cli/cli.js",
