@@ -40,13 +40,9 @@ wechat-spider scrape "新华社" --pages 1 --days 3 --output test_output/opencla
 - ✅ 爬取成功：5 篇文章
 - ✅ 输出文件：`openclaw_test.csv` (25,750 字节)
 
-### 3. Docker/无头服务器测试
+### 3. Docker/无头服务器测试（历史记录）
 
-**测试流程**:
-1. 导出登录凭证：`wechat-spider export-login`
-2. 在无头环境导入凭证：`wechat-spider import-login <encoded_string>`
-3. 验证登录状态：`wechat-spider status`
-4. 爬取文章：`wechat-spider scrape "央视新闻" --pages 1 --days 3`
+这部分记录的是旧版 Python 实验，不再是推荐部署流程。WC01 只是编码而非加密，禁止把它作为位置参数、聊天内容、CI 输出或共享日志迁移。当前支持的 Node CLI 不需要微信登录；若必须使用旧版 Python，请在目标机器重新扫码认证。详见 [`docs/legacy-python.md`](docs/legacy-python.md)。
 
 **结果**:
 - ✅ 凭证导入成功
@@ -84,24 +80,9 @@ wechat-spider login
 wechat-spider scrape "公众号名称" --pages 5 --days 30 --content --output result.csv
 ```
 
-### Docker 无头服务器
+### Docker / 无头服务器
 
-```bash
-# 1. 在有浏览器的机器上导出凭证
-wechat-spider login
-wechat-spider export-login
-# 复制输出的 WC01... 字符串
-
-# 2. 在 Docker 容器中
-FROM python:3.11-slim
-RUN pip install git+https://github.com/qbu11/wechat-article-spider.git
-
-# 3. 导入凭证
-wechat-spider import-login "WC01..."
-
-# 4. 使用
-wechat-spider scrape "公众号名称" --pages 5 --days 30 --content
-```
+推荐直接使用公开来源的 Node `npx` CLI，无需迁移微信 Cookie。旧版 Python 登录态不可安全地通过命令行字符串部署到无头服务器；请在目标环境重新认证，或不要使用该遗留流程。
 
 ---
 
@@ -110,7 +91,7 @@ wechat-spider scrape "公众号名称" --pages 5 --days 30 --content
 ✅ **所有环境测试通过**
 
 - 本地 Claude Code 和 OpenClaw 共享同一 Python 环境，功能正常
-- 无头服务器模式通过 `export-login` / `import-login` 实现凭证迁移，无需浏览器
+- 旧版无头凭证迁移结论已废弃；当前不建议传输 WC01
 - CSV 输出格式正确，包含公众号、标题、发布时间、链接、内容（Markdown 格式）
 
 ---
@@ -120,4 +101,4 @@ wechat-spider scrape "公众号名称" --pages 5 --days 30 --content
 1. **登录凭证有效期**: 约 4-7 天，过期需重新扫码
 2. **请求频率**: 建议间隔 >= 3 秒，避免被限制
 3. **内容获取**: `--content` 参数会增加耗时，按需使用
-4. **无头服务器**: 必须先在有浏览器的机器上登录并导出凭证
+4. **无头服务器**: 不要通过 argv、聊天或日志传输 WC01；旧版流程应在目标机器重新认证

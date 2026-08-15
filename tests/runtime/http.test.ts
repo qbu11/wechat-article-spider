@@ -6,6 +6,7 @@ afterEach(() => {
 });
 
 describe("safeFetchText hardening", () => {
+  const publicLookup = async () => [{ address: "203.0.113.10" }];
   it.each([
     "https://127.0.0.1/private",
     "https://localhost/private",
@@ -25,6 +26,7 @@ describe("safeFetchText hardening", () => {
     await expect(
       safeFetchText("https://public.test/start", {
         allowedHosts: new Set(["public.test", "localhost"]),
+        lookupAddresses: publicLookup,
       }),
     ).rejects.toThrow("Local network hosts are not allowed");
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -35,6 +37,7 @@ describe("safeFetchText hardening", () => {
     await expect(
       safeFetchText("https://public.test/large", {
         allowedHosts: new Set(["public.test"]),
+        lookupAddresses: publicLookup,
         maxBytes: 4,
       }),
     ).rejects.toThrow("Response exceeds the 4 byte limit");
@@ -53,6 +56,7 @@ describe("safeFetchText hardening", () => {
     await expect(
       safeFetchText("https://public.test/cancel", {
         allowedHosts: new Set(["public.test"]),
+        lookupAddresses: publicLookup,
         signal: controller.signal,
       }),
     ).rejects.toThrow("caller cancelled");
@@ -62,8 +66,22 @@ describe("safeFetchText hardening", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("rate limited", { status: 429 })));
     const response = await safeFetchText("https://public.test/rate", {
       allowedHosts: new Set(["public.test"]),
+      lookupAddresses: publicLookup,
     });
     expect(response.status).toBe(429);
     expect(response.body).toBe("rate limited");
   });
+
+  it.each(["127.0.0.1", "::ffff:127.0.0.1", "::ffff:7f00:1", "fe80::1", "febf::1"])(
+    "rejects private DNS answers even for an allowlisted host: %s",
+    async (address) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(safeFetchText("https://public.test/private", {
+        allowedHosts: new Set(["public.test"]),
+        lookupAddresses: async () => [{ address }],
+      })).rejects.toThrow("private or unavailable");
+      expect(fetchMock).not.toHaveBeenCalled();
+    },
+  );
 });

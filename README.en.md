@@ -24,7 +24,7 @@ npx @qbu11/wechat-agent-kit install
 Before the first npm registry release, use the pinned GitHub version directly:
 
 ```bash
-npx github:qbu11/wechat-article-spider#v0.2.0 install
+npx github:qbu11/wechat-article-spider#v0.2.1 install
 ```
 
 The installer previews its writes and asks for confirmation, then installs three standard Agent Skills for Claude Code, Codex, and generic `.agents/skills` consumers. There is no `postinstall`; dry runs, project scope, backups, and ownership-aware uninstall are built in.
@@ -57,21 +57,21 @@ Every command emits structured JSON on stdout for predictable agent and script i
 Ask your agent to search for recent WeChat articles about a topic, summarize a supplied WeChat link with provenance, or subscribe to a supplied Atom feed and sync it once.
 
 ```bash
-wechat-agent query --keywords "OpenAI" --scope hybrid --limit 10 --json
-wechat-agent query --account "Huxiu" --after 2026-08-01 --before 2026-08-15 --scope hybrid --limit 20 --json
-wechat-agent read --url "https://mp.weixin.qq.com/s/..." --content full --json
-wechat-agent subscribe --feed-url "https://example.com/wechat.xml" --label "My feed" --json
-wechat-agent sync --json
-wechat-agent list --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --keywords "OpenAI" --scope hybrid --limit 10 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --account "Huxiu" --after 2026-08-01 --before 2026-08-15 --scope hybrid --limit 20 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 read --url "https://mp.weixin.qq.com/s/..." --content full --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 subscribe --feed-url "https://example.com/wechat.xml" --label "My feed" --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 sync --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 list --json
 ```
 
-If the binary is not global, the bundled skills fall back to an exact-version `npx` command. See every command with:
+The bundled skills always use an exact-version `npx` command and do not depend on a globally installed bare executable. See every command with:
 
 ```bash
 npx @qbu11/wechat-agent-kit --help
 ```
 
-`query` does not fetch every article body. It runs local and network discovery concurrently and returns compact JSON as quickly as possible. Each result separates `originalUrl` from `discoveryUrl`; a Sogou redirect is never mislabeled as an original link. See the [Skill workflow and data-processing specification](docs/workflow-and-data-processing.md) for intent routing, provenance, deduplication, and sync rules.
+`query` does not fetch every article body. It runs local and network discovery concurrently and returns compact JSON as quickly as possible. `--keywords` selects a cross-publisher `keyword-search`; `--account` with explicit date boundaries selects a single-publisher `account-window`. Remote account windows are best-effort: an empty result does not prove that the publisher posted nothing. For durable, repeatable coverage, subscribe a verified feed, run `sync`, and query the local index. Each result separates `originalUrl` from `discoveryUrl`: only a URL whose hostname is exactly `mp.weixin.qq.com` may be described as an original WeChat article link; Sogou redirects and every other host are discovery provenance. See the [Skill workflow and data-processing specification](docs/workflow-and-data-processing.md) for intent routing, provenance, deduplication, and sync rules.
 
 ## Honest boundaries
 
@@ -79,13 +79,14 @@ WeChat does not expose a stable public subscription API for this use. Persistent
 
 - Global discovery uses Sogou WeChat Search and may face CAPTCHA, rate limits, or markup changes. The CLI reports this instead of bypassing access controls.
 - Reading supports public original WeChat URLs and distinguishes deleted, blocked, and incomplete pages.
-- Updates happen only on explicit `sync`. Use a scheduler you control if periodic invocation is needed.
+- Updates happen only on explicit `sync`. If periodic invocation is needed, use a scheduler you control to run the pinned `npx -y @qbu11/wechat-agent-kit@0.2.1 sync --json` command.
 - Coverage and delay are determined by the feed provider; this project does not claim a complete account archive.
+- Public feeds may use `--feed-url`. A URL with a private query token must come from a user-managed secret source through `--feed-url-stdin`; never place the literal in an Agent command, argv, or logs.
 
 ## Local-first and secure
 
 - Articles and subscriptions live in one `wechat-agent.sqlite` file in the OS application data directory. Override it with `WECHAT_AGENT_DATA_DIR`.
-- Network access rejects private targets, unsafe redirects, and oversized responses. All fetched content remains untrusted input.
+- Network access checks and rejects resolved private targets before every request, plus unsafe redirects and oversized responses. Native Node `fetch` cannot fully eliminate the DNS-rebinding timing window; see [Security](SECURITY.md). All fetched content remains untrusted input.
 - The installer backs up conflicts and only uninstalls unchanged files that it owns.
 - Cookies, browser profiles, and authentication headers are not printed.
 

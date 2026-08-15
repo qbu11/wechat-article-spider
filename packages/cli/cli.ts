@@ -71,7 +71,7 @@ Usage:
   wechat-agent query --account <name> [--keywords <text>] [--after DATE] [--before DATE] [--scope local|global|hybrid] [--limit N] --json
   wechat-agent search --type articles|accounts --query <text> [--scope local|global|hybrid] [--limit N] --json
   wechat-agent read --url <wechat-url> | --article-id <id> [--content metadata|excerpt|full] --json
-  wechat-agent subscribe --feed-url <rss-atom-or-json-feed-url> [--label <name>] --json
+  wechat-agent subscribe (--feed-url <url> | --feed-url-stdin) [--label <name>] --json
   wechat-agent unsubscribe --subscription-id <id> --json
   wechat-agent list --json
   wechat-agent status [--json]
@@ -186,6 +186,7 @@ main().catch((error: unknown) => {
             code: error.code,
             retryable: error.retryable,
             needsUserAction: error.needsUserAction,
+            ...(error.retryAfter ? { retryAfter: error.retryAfter.toISOString() } : {}),
           }
         : {}),
     }),

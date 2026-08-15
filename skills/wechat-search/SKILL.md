@@ -5,7 +5,7 @@ description: Search indexed and discoverable WeChat Official Account articles or
 
 # Query WeChat articles
 
-Run the installed `wechat-agent` CLI first and request machine-readable output with `--json`. If it is unavailable, follow the pinned npm-then-GitHub fallback sequence in [references/search-cli.md](references/search-cli.md); never use an unpinned branch.
+Use the exact-version npm CLI through `npx -y @qbu11/wechat-agent-kit@0.2.1` and request machine-readable output with `--json`. Do not assume that a bare `wechat-agent` executable is installed globally. Follow the fixed Git-tag fallback in [references/search-cli.md](references/search-cli.md) only when npm explicitly reports that this package version is unpublished.
 
 ## Workflow
 
@@ -13,13 +13,13 @@ Run the installed `wechat-agent` CLI first and request machine-readable output w
    - A topic, phrase, or concept without a required publisher is `keyword-search`.
    - Articles from one named account, especially with recent/date/range wording, are `account-window`.
    - A supplied article URL belongs to `wechat-article`; a supplied Feed URL or subscription mutation belongs to `wechat-subscribe`.
-2. Run `wechat-agent search --type accounts --query "<name>" --json` only when the user explicitly wants to discover an account or the account name is ambiguous.
+2. Run `npx -y @qbu11/wechat-agent-kit@0.2.1 search --type accounts --query "<name>" --json` only when the user explicitly wants to discover an account or the account name is ambiguous.
    Account results are for discovery and filtering only. Never imply that an account identifier can be converted into a stable subscription source.
-3. For `keyword-search`, run `wechat-agent query --keywords "<terms>" --scope hybrid --json`.
-4. For `account-window`, run `wechat-agent query --account "<exact display name>" --after <date> --before <date> --scope hybrid --json`. Add `--keywords` only when the user also requests a topic within that account.
+3. For `keyword-search`, run `npx -y @qbu11/wechat-agent-kit@0.2.1 query --keywords "<terms>" --scope hybrid --json`. This searches by topic across available publishers.
+4. For `account-window`, run `npx -y @qbu11/wechat-agent-kit@0.2.1 query --account "<exact display name>" --after <date> --before <date> --scope hybrid --json`. This filters one publisher by normalized display name and publication window; add `--keywords` only when the user also requests a topic within that account. Treat remote coverage as best-effort. An empty result is not proof of no publication; verified Feed + `sync` + local query is the durable path.
 5. Resolve relative dates such as “最近一周” to explicit calendar boundaries in the user's timezone. Do not silently invent a time range when none was requested.
 6. On exit code zero, parse `data.intent` and `data.articles` from stdout. Return the compact link result immediately; fetch full content only when the user selects an article or explicitly asks to read it.
-7. Prefer `originalUrl`. If it is null, use `discoveryUrl` and state that it is an unverified discovery redirect rather than an original link.
+7. Treat `originalUrl` as original only when its hostname is exactly `mp.weixin.qq.com`. Otherwise use the available URL as discovery provenance and do not describe it as a WeChat original link.
 8. On a nonzero exit, parse the failure JSON from stderr. Suggest a narrower query, local-only results, or a later retry only when supported by the error.
 
 Read [references/search-cli.md](references/search-cli.md) before constructing nontrivial filters or interpreting connector status.

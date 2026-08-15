@@ -10,6 +10,7 @@ export interface SafeFetchOptions {
   headers?: Record<string, string>;
   allowHttp?: boolean;
   signal?: AbortSignal;
+  lookupAddresses?: (hostname: string) => Promise<readonly { address: string }[]>;
 }
 
 export interface SafeResponse {
@@ -21,9 +22,21 @@ export interface SafeResponse {
 }
 
 function isPrivateAddress(address: string): boolean {
-  if (address === "::1" || address === "0:0:0:0:0:0:0:1") return true;
-  if (address.startsWith("fc") || address.startsWith("fd") || address.startsWith("fe80:")) return true;
-  const parts = address.split(".").map(Number);
+  const normalized = address.toLocaleLowerCase();
+  if (normalized === "::" || normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  const firstHextet = normalized.match(/^([0-9a-f]{1,4})(?::|$)/u)?.[1];
+  if (firstHextet && (Number.parseInt(firstHextet, 16) & 0xffc0) === 0xfe80) return true;
+  const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/u)?.[1];
+  if (normalized.startsWith("::ffff:") && !mapped) {
+    const hexadecimal = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/u);
+    if (hexadecimal) {
+      const high = Number.parseInt(hexadecimal[1]!, 16);
+      const low = Number.parseInt(hexadecimal[2]!, 16);
+      return isPrivateAddress(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
+    }
+  }
+  const parts = (mapped ?? normalized).split(".").map(Number);
   if (parts.length !== 4 || parts.some(Number.isNaN)) return false;
   const [a, b] = parts as [number, number, number, number];
   return (
@@ -50,11 +63,11 @@ async function validateUrl(url: URL, options: SafeFetchOptions): Promise<void> {
     throw new Error("Local network hosts are not allowed.");
   }
   if (isIP(host) && isPrivateAddress(host)) throw new Error("Private network addresses are not allowed.");
-  if (!options.allowedHosts) {
-    const addresses = await lookup(host, { all: true, verbatim: true });
-    if (addresses.length === 0 || addresses.some((item) => isPrivateAddress(item.address))) {
-      throw new Error("Source resolves to a private or unavailable network address.");
-    }
+  const addresses = options.lookupAddresses
+    ? await options.lookupAddresses(host)
+    : await lookup(host, { all: true, verbatim: true });
+  if (addresses.length === 0 || addresses.some((item) => isPrivateAddress(item.address))) {
+    throw new Error("Source resolves to a private or unavailable network address.");
   }
 }
 

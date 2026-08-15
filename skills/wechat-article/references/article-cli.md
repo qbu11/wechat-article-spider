@@ -1,30 +1,24 @@
 # Article CLI reference
 
-Use the installed executable by default:
+Use the exact npm package through `npx` by default; do not assume a global executable:
 
 ```bash
-wechat-agent read --url "https://mp.weixin.qq.com/s/example" --content full --json
-```
-
-If `wechat-agent` is not on `PATH`, first try the exact npm version:
-
-```bash
-npx -y @qbu11/wechat-agent-kit@0.2.0 read --url "https://mp.weixin.qq.com/s/example" --content full --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 read --url "https://mp.weixin.qq.com/s/example" --content full --json
 ```
 
 Only when npm reports `E404` or explicitly says that this package/version is unpublished, retry the same command from the fixed Git tag:
 
 ```bash
-npx -y github:qbu11/wechat-article-spider#v0.2.0 read --url "https://mp.weixin.qq.com/s/example" --content full --json
+npx -y github:qbu11/wechat-article-spider#v0.2.1 read --url "https://mp.weixin.qq.com/s/example" --content full --json
 ```
 
-The GitHub fallback is slower on its first run but can be cached by npm. Do not use it for authentication, connectivity, integrity, or runtime failures; report those errors instead. Never replace `0.2.0` with `latest`, and never use `main` or `master`.
+The GitHub fallback is slower on its first run but can be cached by npm. Do not use it for authentication, connectivity, integrity, or runtime failures; report those errors instead. Never replace `0.2.1` with `latest`, and never use `main` or `master`.
 
 ## Arguments
 
 - `--url <url>`, optional when `--article-id` is supplied; accept only supported WeChat article hosts.
 - `--article-id <id>`, optional when `--url` is supplied.
-- `--content metadata|excerpt|full`, choose the least data necessary.
+- `--content metadata|excerpt|full`, choose the least data necessary. `full` is the default and retains the normalized HTML and/or Markdown that the source provides; `excerpt` removes both content fields and adds up to 800 characters derived from Markdown or stripped HTML; `metadata` removes both content fields and does not add an excerpt. A new `--url` still has to fetch the page before this output projection; an indexed `--article-id` reads locally.
 - `--json`, always include for agent use.
 
 Supply exactly one of `--url` and `--article-id` in normal use.

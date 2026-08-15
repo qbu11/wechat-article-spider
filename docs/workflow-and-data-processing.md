@@ -1,6 +1,6 @@
 # Skill 流程与数据处理规程
 
-_适用于 WeChat Agent Kit 0.2；CLI-only，无 MCP、常驻服务或内置调度器。_
+_适用于 WeChat Agent Kit 0.2.1；npx + CLI-only，无 MCP、常驻服务或内置调度器。_
 
 ---
 
@@ -43,7 +43,7 @@ flowchart LR
   class fast_json,full_json output
 ```
 
-Agent 只需要会读取标准 `SKILL.md` 并运行命令。Claude Code、Codex 和通用 Agent Skills 目录由安装器直接支持；其他 Agent 即使不支持 Skill 发现，也可以调用同一套 `wechat-agent ... --json` 契约。
+Agent 只需要会读取标准 `SKILL.md` 并运行命令。Claude Code、Codex 和通用 Agent Skills 目录由安装器直接支持；其他 Agent 即使不支持 Skill 发现，也可以调用同一套固定版本 `npx -y @qbu11/wechat-agent-kit@0.2.1 ... --json` 契约。
 
 ## 🔀 意图判定
 
@@ -114,6 +114,7 @@ sequenceDiagram
 2. `hybrid` 同时启动本地与网络查询，不串行等待本地结束。
 3. 网络失败而本地有结果时，保留本地结果并在 `warnings` 中说明降级；`global` 或完全无结果时返回结构化错误。
 4. 正文读取是第二步显式操作，避免搜索 20 篇文章时产生 20 次慢请求和验证码风险。
+5. 远端 `account-window` 只能做 best-effort 发现；空结果不能解释为“该公众号没有发文”。指定公众号的可持续时间窗查询依赖已验证 Feed 同步进本地索引。
 
 ## 🧱 数据模型
 
@@ -182,8 +183,8 @@ SQLite 不需要用户安装数据库服务。CLI 首次运行时在操作系统
 来源与链接规程：
 
 - 每篇规范文章可以有多个 `ARTICLE_SOURCE`；来源信息不可在合并时丢失。
-- Feed 或公开微信页面给出的非搜狗文章地址可成为 `originalUrl`。
-- 搜狗跳转地址只能成为 `discoveryUrl`；在安全解析为原文前，绝不冒充 `originalUrl`。
+- 只有协议为 HTTPS、主机名严格为 `mp.weixin.qq.com` 且路径为 `/s` 或 `/s/...` 的地址可成为 `originalUrl`。
+- 搜狗跳转、Feed 镜像和其他任意主机只能成为 `discoveryUrl`；在安全解析为微信原文前，绝不冒充 `originalUrl`。
 - `url` 是当前最可用的地址，`linkKind` 明确标记 `original` 或 `discovery`。
 
 身份与去重规程：
@@ -232,6 +233,8 @@ SQLite 不需要用户安装数据库服务。CLI 首次运行时在操作系统
 - `subscribe` 只接受明确提供且解析验证成功的 HTTPS RSS 2.0、Atom 或 JSON Feed；不会从公众号名猜测 Feed。
 - 只有显式 `sync` 才更新订阅。若需周期运行，由用户授权的外部调度器调用固定命令。
 - 网络层拒绝 URL 内嵌凭据、私网/本机目标、危险重定向、过多跳转和超大响应。
+- 带 query 参数的私有 Feed URL 使用本机 `feed-url.key` 做 AES-256-GCM 加密，列表、状态和 JSON 响应只回显移除 query 的公共部分。历史版本已写入的明文 URL 不会自动迁移，应删除后重新订阅。
+- Node 原生 `fetch` 无法把预解析地址固定到实际连接，DNS 解析校验与连接之间仍存在理论上的重绑定窗口；不要订阅不受信任域名或将 CLI 放在可访问敏感内网的高权限环境中。
 - 每次同步记录状态和来源健康度；写文章与来源使用稳定身份，支持安全重试。
 - 搜狗发现和第三方 Feed 都可能不完整、延迟或受限，任何成功返回都不等于完整公众号档案。
 

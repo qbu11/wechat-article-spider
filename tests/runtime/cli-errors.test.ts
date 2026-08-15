@@ -50,4 +50,20 @@ describe("CLI error JSON", () => {
       error: "Unknown command: unknown-command",
     });
   });
+
+  it("rejects unsupported read content levels before fetching", async () => {
+    const result = await runCli(
+      "read",
+      "--url",
+      "https://mp.weixin.qq.com/s/example",
+      "--content",
+      "summary",
+      "--json",
+    );
+    expect(result.exitCode).toBe(1);
+    expect(JSON.parse(result.stderr.trim().split("\n").at(-1)!)).toEqual({
+      success: false,
+      error: "Unsupported content level: summary",
+    });
+  });
 });

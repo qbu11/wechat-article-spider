@@ -3,6 +3,7 @@ import {
   cp,
   mkdir,
   readFile,
+  readlink,
   readdir,
   rename,
   rm,
@@ -14,7 +15,7 @@ import { appDataDir, findPackageRoot, skillTargetRoot } from "./paths.js";
 import type { AgentTarget, InstallScope } from "./paths.js";
 
 const PACKAGE_NAME = "@qbu11/wechat-agent-kit";
-const PACKAGE_VERSION = "0.2.0";
+const PACKAGE_VERSION = "0.2.1";
 
 export interface InstallOptions {
   agents: AgentTarget[];
@@ -58,18 +59,44 @@ async function pathExists(path: string): Promise<boolean> {
 
 async function digestDirectory(root: string): Promise<string> {
   const hash = createHash("sha256");
-  const visit = async (path: string): Promise<void> => {
+  const frame = (kind: string, path: string, content = Buffer.alloc(0)): void => {
+    const kindBuffer = Buffer.from(kind, "utf8");
+    const pathBuffer = Buffer.from(path, "utf8");
+    const header = Buffer.alloc(24);
+    header.writeBigUInt64BE(BigInt(kindBuffer.byteLength), 0);
+    header.writeBigUInt64BE(BigInt(pathBuffer.byteLength), 8);
+    header.writeBigUInt64BE(BigInt(content.byteLength), 16);
+    hash.update(header).update(kindBuffer).update(pathBuffer).update(content);
+  };
+  const visit = async (path: string, relativePath = ""): Promise<void> => {
     const entries = await readdir(path, { withFileTypes: true });
     entries.sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
       const child = join(path, entry.name);
-      hash.update(entry.name);
-      if (entry.isDirectory()) await visit(child);
-      else hash.update(await readFile(child));
+      const childRelative = join(relativePath, entry.name);
+      if (entry.isDirectory()) {
+        frame("directory", childRelative);
+        await visit(child, childRelative);
+      } else if (entry.isSymbolicLink()) {
+        frame("symlink", childRelative, Buffer.from(await readlink(child), "utf8"));
+      } else if (entry.isFile()) {
+        frame("file", childRelative, await readFile(child));
+      } else {
+        frame("other", childRelative);
+      }
     }
   };
   await visit(root);
   return hash.digest("hex");
+}
+
+async function readOwnershipManifest(path: string): Promise<OwnershipManifest | undefined> {
+  if (!(await pathExists(path))) return undefined;
+  const manifest = JSON.parse(await readFile(path, "utf8")) as OwnershipManifest;
+  if (manifest.package !== PACKAGE_NAME || !Array.isArray(manifest.files)) {
+    throw new Error(`Refusing to replace an unrecognized ownership manifest: ${path}`);
+  }
+  return manifest;
 }
 
 async function atomicJson(path: string, value: unknown): Promise<void> {
@@ -103,6 +130,8 @@ export async function install(options: InstallOptions): Promise<InstallOperation
 
   const packageRoot = options.packageRoot ?? findPackageRoot();
   const dataRoot = options.dataDir ?? appDataDir();
+  const manifestPath = join(dataRoot, "ownership.json");
+  const previousManifest = await readOwnershipManifest(manifestPath);
   const stamp = new Date().toISOString().replaceAll(":", "-");
   const owned: OwnedFile[] = [];
   const skills = await readdir(join(packageRoot, "skills"), { withFileTypes: true });
@@ -126,13 +155,15 @@ export async function install(options: InstallOptions): Promise<InstallOperation
     }
   }
 
+  const installedPaths = new Set(owned.map((file) => resolve(file.path)));
+  const previousFiles = previousManifest?.files.filter((file) => !installedPaths.has(resolve(file.path))) ?? [];
   const manifest: OwnershipManifest = {
     package: PACKAGE_NAME,
     version: PACKAGE_VERSION,
     installedAt: new Date().toISOString(),
-    files: owned,
+    files: [...previousFiles, ...owned],
   };
-  await atomicJson(join(dataRoot, "ownership.json"), manifest);
+  await atomicJson(manifestPath, manifest);
   return operations;
 }
 
@@ -160,6 +191,7 @@ export async function uninstall(options: Omit<InstallOptions, "packageRoot">): P
     const currentDigest = await digestDirectory(file.path);
     if (currentDigest !== file.digest) {
       operations.push({ action: "skip", target: file.path, detail: "User-modified skill was preserved." });
+      remaining.push(file);
       continue;
     }
     operations.push({ action: "remove", target: file.path, detail: "Remove an unmodified managed skill." });

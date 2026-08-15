@@ -48,18 +48,32 @@ export function mapFeedItem(
   connectorId: string,
   now: Date,
 ): DiscoveredArticle {
+  let parsedItemUrl: URL;
+  try {
+    parsedItemUrl = new URL(item.url);
+  } catch (cause) {
+    throw new ConnectorError("PARSE_ERROR", "Feed item has an invalid URL", { cause });
+  }
+  if (parsedItemUrl.protocol !== "https:") {
+    throw new ConnectorError("PARSE_ERROR", "Feed item URL must use HTTPS");
+  }
+  if (parsedItemUrl.username || parsedItemUrl.password) {
+    throw new ConnectorError("PARSE_ERROR", "Feed item URL must not contain embedded credentials");
+  }
   let identity;
   try {
-    identity = deriveStableArticleIdentity(item.url);
+    identity = deriveStableArticleIdentity(parsedItemUrl);
   } catch (cause) {
-    throw new ConnectorError("PARSE_ERROR", `Feed item has an invalid URL: ${item.url}`, { cause });
+    throw new ConnectorError("PARSE_ERROR", "Feed item has an invalid URL", { cause });
   }
 
   const title = item.title.trim();
   if (!title) throw new ConnectorError("PARSE_ERROR", "Feed item has no title");
   const timestamp = now.toISOString();
   const sourceUrl = normalizeUrl(item.url).href;
-  const content = item.contentHtml ?? item.contentText ?? item.summary ?? title;
+  const contentHtml = item.contentHtml?.trim() ? item.contentHtml : undefined;
+  const contentMarkdown = item.contentText?.trim() ? item.contentText : undefined;
+  const content = contentHtml ?? contentMarkdown ?? item.summary?.trim() ?? title;
 
   return {
     article: {
@@ -71,8 +85,8 @@ export function mapFeedItem(
       updatedAt: item.modifiedAt ?? timestamp,
       ...(item.author?.trim() ? { author: item.author.trim() } : {}),
       ...(item.summary?.trim() ? { summary: item.summary.trim() } : {}),
-      ...(item.contentHtml !== undefined ? { contentHtml: item.contentHtml } : {}),
-      ...(item.contentText !== undefined ? { contentMarkdown: item.contentText } : {}),
+      ...(contentHtml ? { contentHtml } : {}),
+      ...(contentMarkdown ? { contentMarkdown } : {}),
       ...(item.publishedAt ? { publishedAt: item.publishedAt } : {}),
       ...(item.metadata ? { metadata: item.metadata } : {}),
     },

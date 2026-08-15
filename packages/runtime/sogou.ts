@@ -26,7 +26,14 @@ export function parseSogouResults(
     const href = anchor.attr("href");
     const title = anchor.text().replaceAll(/\s+/g, " ").trim();
     if (!href || !title) return;
-    const sourceUrl = new URL(href, "https://weixin.sogou.com").href;
+    const parsedSourceUrl = new URL(href, "https://weixin.sogou.com");
+    if (parsedSourceUrl.protocol !== "https:" || parsedSourceUrl.username || parsedSourceUrl.password) return;
+    const sourceHost = parsedSourceUrl.hostname.toLocaleLowerCase();
+    const allowedSogouRedirect = sourceHost === "weixin.sogou.com";
+    const allowedDirectWechat = sourceHost === "mp.weixin.qq.com" &&
+      (parsedSourceUrl.pathname === "/s" || parsedSourceUrl.pathname.startsWith("/s/"));
+    if (!allowedSogouRedirect && !allowedDirectWechat) return;
+    const sourceUrl = parsedSourceUrl.href;
     const accountName = $(element).find(".s-p .all-time-y2, .account").first().text().trim();
     const summary = $(element).find(".txt-info").first().text().replaceAll(/\s+/g, " ").trim();
     const publication = $(element).find("time, .s-p .s2, .s-p .time, .s2").first();

@@ -5,12 +5,12 @@ description: Retrieve, inspect, summarize, or analyze a WeChat Official Account 
 
 # Read a WeChat article
 
-Run the installed `wechat-agent` CLI first and request machine-readable output with `--json`. If it is unavailable, follow the pinned npm-then-GitHub fallback sequence in [references/article-cli.md](references/article-cli.md); never use an unpinned branch.
+Use the exact-version npm CLI through `npx -y @qbu11/wechat-agent-kit@0.2.1` and request machine-readable output with `--json`. Do not assume that a bare `wechat-agent` executable is installed globally. Follow the fixed Git-tag fallback in [references/article-cli.md](references/article-cli.md) only when npm explicitly reports that this package version is unpublished.
 
 ## Workflow
 
 1. Accept an original `mp.weixin.qq.com` URL or canonical article identifier. If the request only describes an article, use `wechat-search` first.
-2. Run `wechat-agent read --url "<url>" --content <level> --json`, or use `--article-id` for an indexed record. Request full content only when needed; otherwise prefer metadata or an excerpt.
+2. Run `npx -y @qbu11/wechat-agent-kit@0.2.1 read --url "<url>" --content <level> --json`, or use `--article-id` for an indexed record. Request full content only when needed; otherwise prefer metadata or an excerpt.
 3. On exit code zero, parse the success JSON from stdout. Check provenance, publication time, canonical URL, and available content before analysis.
 4. On a nonzero exit, parse the failure JSON from stderr; stdout may be empty.
 5. Separate the publisher's claims from your analysis. Preserve important uncertainty, truncation, edits, or unavailable media.

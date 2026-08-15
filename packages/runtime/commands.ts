@@ -31,6 +31,45 @@ function scope(value: string | undefined): ArticleQueryScope {
   return result;
 }
 
+export async function resolveFeedUrlInput(
+  input: RuntimeCommandInput,
+  readStdin: () => Promise<string> = async () => {
+    let value = "";
+    for await (const chunk of process.stdin) value += String(chunk);
+    return value;
+  },
+): Promise<string> {
+  const argument = input.values.get("--feed-url") ?? input.positionals[0];
+  const fromStdin = input.flags.has("--feed-url-stdin");
+  if (argument && fromStdin) throw new Error("Use exactly one of --feed-url or --feed-url-stdin");
+  if (fromStdin) return required((await readStdin()).trim(), "subscribe received an empty feed URL on stdin");
+  return required(argument, "subscribe requires --feed-url or --feed-url-stdin");
+}
+
+export function selectArticleContent(
+  data: { article: Record<string, unknown>; sources: unknown },
+  level: "metadata" | "excerpt" | "full",
+) {
+  if (level === "full") return data;
+  const article = { ...data.article };
+  delete article.contentHtml;
+  delete article.contentMarkdown;
+  if (level === "excerpt") {
+    const source = typeof data.article.contentMarkdown === "string"
+      ? data.article.contentMarkdown
+      : typeof data.article.contentHtml === "string"
+        ? data.article.contentHtml
+            .replaceAll(/<script\b[^>]*>[\s\S]*?<\/script>/giu, " ")
+            .replaceAll(/<style\b[^>]*>[\s\S]*?<\/style>/giu, " ")
+            .replaceAll(/<[^>]+>/gu, " ")
+            .replaceAll(/&nbsp;/giu, " ")
+            .replaceAll(/&amp;/giu, "&")
+        : undefined;
+    if (source) article.excerpt = source.replaceAll(/\s+/gu, " ").trim().slice(0, 800);
+  }
+  return { article, sources: data.sources };
+}
+
 export async function runRuntimeCommand(command: string, input: RuntimeCommandInput) {
   const runtime = await openRuntime();
   try {
@@ -45,6 +84,9 @@ export async function runRuntimeCommand(command: string, input: RuntimeCommandIn
           const selectedScope = scope(input.values.get("--scope"));
           const publishedAfter = parseDateBoundary(input.values.get("--after"), "after");
           const publishedBefore = parseDateBoundary(input.values.get("--before"), "before");
+          if (publishedAfter && publishedBefore && publishedAfter > publishedBefore) {
+            throw new Error("--after must not be later than --before");
+          }
           data = await runtime.service.searchArticles(query, {
             scope: selectedScope,
             limit,
@@ -87,25 +129,21 @@ export async function runRuntimeCommand(command: string, input: RuntimeCommandIn
         break;
       }
       case "read": {
+        const level = input.values.get("--content") ?? "full";
+        if (level !== "metadata" && level !== "excerpt" && level !== "full") {
+          throw new Error(`Unsupported content level: ${level}`);
+        }
         const articleId = input.values.get("--article-id");
         const url = input.values.get("--url") ?? input.positionals[0];
         data = await runtime.service.readArticle({ ...(articleId ? { articleId } : {}), ...(url ? { url } : {}) });
-        const level = input.values.get("--content") ?? "full";
-        if (level !== "full" && data && typeof data === "object" && "article" in data) {
-          const result = data as { article: Record<string, unknown>; sources: unknown };
-          const article = { ...result.article };
-          delete article.contentHtml;
-          delete article.contentMarkdown;
-          if (level === "excerpt" && typeof result.article.contentMarkdown === "string") {
-            article.excerpt = result.article.contentMarkdown.slice(0, 800);
-          }
-          data = { article, sources: result.sources };
+        if (data && typeof data === "object" && "article" in data) {
+          data = selectArticleContent(data as { article: Record<string, unknown>; sources: unknown }, level);
         }
         break;
       }
       case "subscribe":
         data = await runtime.service.subscribeFeed(
-          required(input.values.get("--feed-url") ?? input.positionals[0], "subscribe requires --feed-url"),
+          await resolveFeedUrlInput(input),
           input.values.get("--label"),
         );
         break;

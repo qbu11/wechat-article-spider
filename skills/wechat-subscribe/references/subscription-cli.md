@@ -1,15 +1,15 @@
 # Subscription CLI reference
 
-Use `wechat-agent` by default. If it is not on `PATH`, first replace only the executable portion with the exact npm version:
+Use the exact npm package through `npx` by default; do not assume a global executable:
 
 ```bash
-npx -y @qbu11/wechat-agent-kit@0.2.0 <command> ... --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 <command> ... --json
 ```
 
 Only when npm reports `E404` or explicitly says that this package/version is unpublished, retry the same command from the fixed Git tag:
 
 ```bash
-npx -y github:qbu11/wechat-article-spider#v0.2.0 <command> ... --json
+npx -y github:qbu11/wechat-article-spider#v0.2.1 <command> ... --json
 ```
 
 The GitHub fallback is slower on its first run but can be cached by npm. Do not use it for authentication, connectivity, integrity, or runtime failures; report those errors instead. Never use an unpinned package version, `main`, or `master` during an agent-run workflow.
@@ -31,15 +31,21 @@ The CLI must fetch within its network-safety policy, follow only safe redirects,
 ### Subscribe
 
 ```bash
-wechat-agent subscribe --feed-url "https://example.com/wechat.xml" --label "Example account" --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 subscribe --feed-url "https://example.com/wechat.xml" --label "Example account" --json
 ```
 
-`--feed-url` is required. `--label` is optional user-facing metadata. Successful output contains the stored subscription, including its identifier, normalized source URL, label when supplied, and detected format in metadata.
+Use `--feed-url` for public URLs. For a private URL containing a query token, use a user-managed secret source and stdin so the literal never enters argv or shell history:
+
+```bash
+printf '%s' "$WECHAT_PRIVATE_FEED_URL" | npx -y @qbu11/wechat-agent-kit@0.2.1 subscribe --feed-url-stdin --label "Private feed" --json
+```
+
+The user must set `WECHAT_PRIVATE_FEED_URL` outside Agent-visible commands and shared logs. If no protected secret source is available, ask the user to perform this local command rather than embedding the URL in a tool call. `--label` is optional user-facing metadata. Successful output contains the stored subscription, including its identifier, redacted source URL, label when supplied, and detected format in metadata.
 
 ### Unsubscribe
 
 ```bash
-wechat-agent unsubscribe --subscription-id "<id>" --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 unsubscribe --subscription-id "<id>" --json
 ```
 
 Unsubscribing stops future explicit synchronization; it does not imply deletion of indexed articles. Never pass a cached-data deletion option without separate explicit confirmation.
@@ -47,7 +53,7 @@ Unsubscribing stops future explicit synchronization; it does not imply deletion 
 ### List
 
 ```bash
-wechat-agent list --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 list --json
 ```
 
 The command returns all stored subscriptions. Each record may include its identifier, source URL, label, detected format in metadata, state, and last successful sync.
@@ -55,7 +61,7 @@ The command returns all stored subscriptions. Each record may include its identi
 ### Synchronize
 
 ```bash
-wechat-agent sync --subscription-id "<id>" --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 sync --subscription-id "<id>" --json
 ```
 
 Omit `--subscription-id` only for an explicit request to synchronize all active subscriptions. Output is an array of sync runs with status and discovered/stored article counts.
@@ -65,7 +71,7 @@ No internal scheduling is implied. A subscription changes only when `sync` runs.
 ### Status
 
 ```bash
-wechat-agent status --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 status --json
 ```
 
 Use status to distinguish database readiness, feed health, recent sync runs, and article freshness. Do not report automatic update state because this package updates only through explicit `sync` calls.
@@ -75,7 +81,7 @@ Use status to distinguish database readiness, feed health, recent sync runs, and
 After sync, search the local index using known article or publisher metadata:
 
 ```bash
-wechat-agent query --account "<exact publisher label>" --scope local --limit 20 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --account "<exact publisher label>" --scope local --limit 20 --json
 ```
 
 Do not interpret an empty result as proof of no publications when the feed is stale or incomplete.

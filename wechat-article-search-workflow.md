@@ -1,11 +1,11 @@
 # 微信文章搜索工作流
 
-当前工作流只有一个自动化边界：`wechat-agent` JSON CLI。
+当前工作流只有一个自动化边界：通过固定版本 `npx` 调用的 JSON CLI。
 
 ```bash
-wechat-agent query --keywords "关键词" --scope hybrid --limit 10 --json
-wechat-agent query --account "公众号显示名" --after 2026-08-01 --before 2026-08-15 --scope hybrid --limit 20 --json
-wechat-agent read --url "https://mp.weixin.qq.com/s/..." --content full --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --keywords "关键词" --scope hybrid --limit 10 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --account "公众号显示名" --after 2026-08-01 --before 2026-08-15 --scope hybrid --limit 20 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 read --url "https://mp.weixin.qq.com/s/..." --content full --json
 ```
 
 - `keyword-search` 用 `--keywords`；指定公众号文章使用 `account-window` 的 `--account` 和可选时间边界，两者会在返回 JSON 中明确回显。

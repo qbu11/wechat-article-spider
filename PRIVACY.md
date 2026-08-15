@@ -16,7 +16,9 @@ The Node CLI automatically creates one SQLite file named
 
 `WECHAT_AGENT_DATA_DIR` can override this location. The database contains
 indexed article metadata/content, source URLs, subscriptions, cursors, source
-health, and sync history. Skill installation also records an ownership
+health, and sync history. Feed URLs with query parameters are stored as an
+AES-256-GCM ciphertext; the local key is `feed-url.key`, and command responses
+show only the URL without its query. Skill installation also records an ownership
 manifest and may retain backups under the same application-data directory.
 There is no remote project database or automatic upload.
 
@@ -40,9 +42,18 @@ project's control.
 
 ## Sensitive data
 
-Avoid putting secrets or private intranet URLs into feed URLs, labels, search
-queries, issue reports, and logs. URLs containing embedded credentials are
-rejected, and local/private-network feed targets are blocked.
+Avoid putting secrets or private intranet URLs into labels, search queries,
+issue reports, and logs. URLs containing embedded credentials are rejected,
+and local/private-network feed targets are blocked. If a feed requires a token
+in its query string, the current Node CLI encrypts that complete URL locally
+and redacts the query from JSON responses. Releases before 0.2.1 are not
+automatically migrated; remove and re-add such subscriptions.
+
+`subscribe --feed-url ...` is a command-line argument and may be visible to
+local process inspection or retained by shell history, so it is only suitable
+for public URLs. For a private query token, provide the URL through
+`--feed-url-stdin` from a user-managed secret source; never put the literal URL
+in `printf`, `echo`, a heredoc, an Agent command, or shared logs.
 
 The legacy Python cache can contain reusable WeChat cookies and tokens. WC01 is
 not encrypted: anyone with the string may recover the credentials. Legacy

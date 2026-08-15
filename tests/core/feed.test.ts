@@ -21,6 +21,25 @@ describe("FeedConnector", () => {
     expect(item.source.externalId).toBe("entry-1");
   });
 
+  it("rejects embedded URL credentials without echoing them", () => {
+    expect(() => mapFeedItem(
+      { format: "rss", url: "https://feed.example/rss", title: "Feed" },
+      { url: "https://user:TOPSECRET@mp.weixin.qq.com/s/example", title: "Article" },
+      "feed-1",
+      now,
+    )).toThrow("must not contain embedded credentials");
+    try {
+      mapFeedItem(
+        { format: "rss", url: "https://feed.example/rss", title: "Feed" },
+        { url: "not-a-url?token=TOPSECRET", title: "Article" },
+        "feed-1",
+        now,
+      );
+    } catch (error) {
+      expect(String(error)).not.toContain("TOPSECRET");
+    }
+  });
+
   it("preserves reader cursors", async () => {
     const connector = new FeedConnector(
       "https://feed.example/rss",

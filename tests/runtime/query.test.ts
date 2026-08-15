@@ -42,6 +42,20 @@ describe("fast article query contract", () => {
   it("normalizes inclusive date-only boundaries", () => {
     expect(parseDateBoundary("2026-08-01", "after")).toBe("2026-08-01T00:00:00.000Z");
     expect(parseDateBoundary("2026-08-15", "before")).toBe("2026-08-15T23:59:59.999Z");
+    expect(() => parseDateBoundary("2026-02-30", "after")).toThrow("Invalid --after date");
+    expect(() => parseDateBoundary("2026-02-30T12:00:00Z", "before")).toThrow("Invalid --before date");
+    expect(() => parseDateBoundary("2026-08-01T24:00:00Z", "after")).toThrow("Invalid --after date");
+    expect(() => parseDateBoundary("2026-08-01 12:00:00", "before")).toThrow("Invalid --before date");
+  });
+
+  it("rejects an explicit keyword intent that also requests an account window", () => {
+    expect(() => inferArticleQueryIntent({
+      intent: "keyword-search",
+      keywords: "AI",
+      account: "示例公众号",
+      scope: "local",
+      limit: 10,
+    })).toThrow("cannot be combined with --account");
   });
 
   it("returns compact JSON with a verified original link", () => {
@@ -65,6 +79,18 @@ describe("fast article query contract", () => {
     });
   });
 
+  it("warns that remote account windows are not a complete publisher archive", () => {
+    const envelope = createFastQueryEnvelope(
+      { account: "示例公众号", scope: "global", limit: 10 },
+      [],
+      5,
+    );
+    expect(envelope.intent.kind).toBe("account-window");
+    expect(envelope.warnings).toContain(
+      "Remote account-window discovery is best-effort; an empty result does not prove that the account published nothing. Use a verified feed plus sync for durable local coverage.",
+    );
+  });
+
   it("never labels a Sogou redirect as an original URL", () => {
     const discovery = structuredClone(originalResult);
     discovery.article.canonicalUrl = "https://weixin.sogou.com/link?url=opaque";
@@ -76,5 +102,24 @@ describe("fast article query contract", () => {
       discoveryUrl: discovery.article.canonicalUrl,
       linkKind: "discovery",
     });
+  });
+
+  it("does not label arbitrary feed or mirror links as original WeChat URLs", () => {
+    const mirror = structuredClone(originalResult);
+    mirror.article.canonicalUrl = "https://mirror.example/posts/one";
+    mirror.sources[0]!.sourceUrl = mirror.article.canonicalUrl;
+    expect(toFastArticleJson(mirror)).toMatchObject({
+      url: mirror.article.canonicalUrl,
+      originalUrl: null,
+      discoveryUrl: mirror.article.canonicalUrl,
+      linkKind: "discovery",
+    });
+  });
+
+  it("never emits a URL containing embedded credentials", () => {
+    const unsafe = structuredClone(originalResult);
+    unsafe.article.canonicalUrl = "https://user:TOPSECRET@mp.weixin.qq.com/s/example";
+    unsafe.sources[0]!.sourceUrl = unsafe.article.canonicalUrl;
+    expect(() => toFastArticleJson(unsafe)).toThrow("no usable URL");
   });
 });

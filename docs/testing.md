@@ -38,7 +38,7 @@ CLI 还应在 JSON 的 `data.intent.kind` 中回显 `keyword-search` 或 `accoun
 
 - `success`、`data.intent`、`data.mode`、`data.articles` 存在且类型稳定。
 - `mode` 为 `fast-links`，搜索阶段不应批量抓正文。
-- `originalUrl` 非空时必须是来源暴露的非搜狗地址。
+- `originalUrl` 非空时必须是 `https://mp.weixin.qq.com/s...` 微信原文地址；其他主机即使不是搜狗也只能作为发现来源。
 - 只有搜狗跳转时，`originalUrl` 必须为 `null`、`linkKind` 必须为 `discovery`，并包含 warning。
 - 每条结果保留 `provenance`，不能只返回无来源标题。
 - 失败时 stdout 不混入成功数据，stderr 是 JSON，退出码非零。
@@ -68,11 +68,11 @@ CLI 还应在 JSON 的 `data.intent.kind` 中回显 `keyword-search` 或 `accoun
 
 ```bash
 export WECHAT_AGENT_DATA_DIR="$(mktemp -d)"
-wechat-agent subscribe --feed-url "https://your-test-host.example/feed.xml" --label "测试号" --json
-wechat-agent sync --json
-wechat-agent sync --json
-wechat-agent query --account "测试号" --scope local --json
-wechat-agent status --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 subscribe --feed-url "https://your-test-host.example/feed.xml" --label "测试号" --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 sync --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 sync --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --account "测试号" --scope local --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 status --json
 ```
 
 验证第一次同步新增文章，第二次不重复新增；指定公众号查询只返回精确标签匹配；数据库状态仍可读取。测试完成后仅删除刚创建并已核对路径的临时目录。
@@ -82,8 +82,8 @@ wechat-agent status --json
 线上来源会变，因此只断言协议和结构，不固定文章标题或数量：
 
 ```bash
-wechat-agent query --keywords "人工智能" --scope global --limit 1 --json
-wechat-agent query --account "人民日报" --after 2026-08-01 --before 2026-08-16 --scope hybrid --limit 3 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --keywords "人工智能" --scope global --limit 1 --json
+npx -y @qbu11/wechat-agent-kit@0.2.1 query --account "人民日报" --after 2026-08-01 --before 2026-08-16 --scope hybrid --limit 3 --json
 ```
 
 接受两种结果：结构正确的成功 JSON；或结构正确的验证码/限流错误。不要把“某次必须返回 3 篇固定文章”设为 CI 条件，否则测试会把第三方内容波动误判成程序回归。
@@ -91,7 +91,7 @@ wechat-agent query --account "人民日报" --after 2026-08-01 --before 2026-08-
 ## 🚀 发布前验证
 
 1. 在 Node.js 22 与 24、Ubuntu/macOS/Windows 上运行 `npm ci`、`npm run validate`、`npm run build` 和打包检查。
-2. 检查 tarball 不含测试、凭证、绝对路径或 MCP 文件，并包含 3 个 Skills、插件清单、文档和已构建 CLI。
+2. 运行 `npm run verify:npm`，检查 npm 11.17 publish dry-run、三个 bin、三个 Skills 和真实 tarball `npx` 调用；同时确认 tarball 不含测试、凭证、绝对路径或 MCP 文件。
 3. 从 tarball 安装到空临时项目，执行 `install --dry-run`、真实安装、`doctor`、卸载预览和卸载。
 4. 用固定 Git tag 再做一次真实 `npx` 安装，确认不依赖开发工作区。
 5. 只有所有本地门禁和远程 CI 全绿后才发布 npm 版本。

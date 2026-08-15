@@ -24,6 +24,11 @@ that a user can inspect and run directly.
 
 - Network fetching permits HTTPS, rejects embedded URL credentials, limits
   redirects and response sizes, and blocks local/private-network destinations.
+- DNS results are checked before each request, including redirects. Because
+  Node's native `fetch` cannot pin that resolved address to the connection,
+  operators should still avoid untrusted feed domains in privileged networks.
+- Feed URL query strings are encrypted locally with AES-256-GCM and redacted
+  from command responses; the local key and SQLite database remain sensitive.
 - Sogou discovery is best-effort and can require a manual captcha. The project
   does not bypass captchas or promise uninterrupted access.
 - A subscription is a user-provided, validated RSS, Atom, or JSON Feed URL. A

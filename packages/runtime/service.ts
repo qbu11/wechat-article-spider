@@ -4,7 +4,9 @@ import { join } from "node:path";
 import {
   ConnectorError,
   createStableId,
+  hashArticleContent,
   type Account,
+  type Article,
   type ArticleSearchResult,
   type SourceHealth,
   type Subscription,
@@ -17,6 +19,13 @@ import { DefaultFeedReader, detectFeedFormat } from "./feed-reader.js";
 import { safeFetchText } from "./http.js";
 import { searchSogou } from "./sogou.js";
 import { DefaultWechatFetcher, DefaultWechatParser } from "./wechat.js";
+import {
+  feedUrlMetadata,
+  loadFeedUrlSecretKey,
+  protectFeedUrl,
+  redactSubscription,
+  revealFeedUrl,
+} from "./feed-url-secret.js";
 
 export interface ArticleSearchOptions {
   scope?: "local" | "global" | "hybrid";
@@ -42,6 +51,55 @@ function resultAccountNames(result: ArticleSearchResult): string[] {
   ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 }
 
+function articleFingerprint(result: ArticleSearchResult): string | undefined {
+  const account = resultAccountNames(result)[0];
+  if (!account || !result.article.publishedAt) return undefined;
+  const title = result.article.title.replaceAll(/\s+/gu, " ").trim().normalize("NFC").toLocaleLowerCase();
+  if (!title) return undefined;
+  return `${normalizedAccount(account)}\u0000${title}\u0000${result.article.publishedAt}`;
+}
+
+function isDirectWechatArticleUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "mp.weixin.qq.com" &&
+      (url.pathname === "/s" || url.pathname.startsWith("/s/"));
+  } catch {
+    return false;
+  }
+}
+
+function mergeSearchCandidates(candidates: ArticleSearchResult[]): ArticleSearchResult[] {
+  const merged = new Map<string, ArticleSearchResult>();
+  const fingerprints = new Map<string, string>();
+  for (const candidate of candidates) {
+    const fingerprint = articleFingerprint(candidate);
+    const matchedId = merged.has(candidate.article.id)
+      ? candidate.article.id
+      : fingerprint ? fingerprints.get(fingerprint) : undefined;
+    if (!matchedId) {
+      merged.set(candidate.article.id, candidate);
+      if (fingerprint) fingerprints.set(fingerprint, candidate.article.id);
+      continue;
+    }
+    const existing = merged.get(matchedId)!;
+    const candidateIsOriginal = isDirectWechatArticleUrl(candidate.article.canonicalUrl);
+    const existingIsOriginal = isDirectWechatArticleUrl(existing.article.canonicalUrl);
+    const preferred = candidateIsOriginal && !existingIsOriginal ? candidate : existing;
+    const targetId = preferred.article.id;
+    const sources = new Map(
+      [...existing.sources, ...candidate.sources].map((source) => [
+        source.id,
+        source.articleId === targetId ? source : { ...source, articleId: targetId },
+      ]),
+    );
+    if (matchedId !== targetId) merged.delete(matchedId);
+    merged.set(targetId, { article: preferred.article, sources: [...sources.values()] });
+    if (fingerprint) fingerprints.set(fingerprint, targetId);
+  }
+  return [...merged.values()];
+}
+
 function matchesArticleFilters(result: ArticleSearchResult, options: ArticleSearchOptions): boolean {
   if (options.accountName) {
     const expected = normalizedAccount(options.accountName);
@@ -64,36 +122,97 @@ async function storeResult(repository: WechatRepository, result: ArticleSearchRe
   for (const source of result.sources) await repository.articles.upsertArticleSource(source);
 }
 
+function mergeArticle(existing: Article, incoming: Article): Article {
+  const meaningful = (value: string | undefined): string | undefined => value?.trim() ? value : undefined;
+  const contentHtml = meaningful(existing.contentHtml) ?? meaningful(incoming.contentHtml);
+  const contentMarkdown = meaningful(existing.contentMarkdown) ?? meaningful(incoming.contentMarkdown);
+  const merged: Article = {
+    ...existing,
+    ...incoming,
+    createdAt: existing.createdAt,
+    updatedAt: existing.updatedAt > incoming.updatedAt ? existing.updatedAt : incoming.updatedAt,
+    ...(incoming.accountId ?? existing.accountId ? { accountId: incoming.accountId ?? existing.accountId } : {}),
+    ...(incoming.author ?? existing.author ? { author: incoming.author ?? existing.author } : {}),
+    ...(incoming.summary ?? existing.summary ? { summary: incoming.summary ?? existing.summary } : {}),
+    ...(contentHtml ? { contentHtml } : {}),
+    ...(contentMarkdown ? { contentMarkdown } : {}),
+    ...(incoming.publishedAt ?? existing.publishedAt
+      ? { publishedAt: incoming.publishedAt ?? existing.publishedAt }
+      : {}),
+    metadata: { ...existing.metadata, ...incoming.metadata },
+  };
+  if (!contentHtml) delete merged.contentHtml;
+  if (!contentMarkdown) delete merged.contentMarkdown;
+  merged.contentHash = hashArticleContent(contentHtml ?? contentMarkdown ?? merged.summary ?? merged.title);
+  return merged;
+}
+
+function retryableSyncCode(code: string | undefined): boolean {
+  return code === "NETWORK_ERROR" || code === "RATE_LIMITED" || code === "SOURCE_UNAVAILABLE" ||
+    code === "STALE_CURSOR" || code === "SYNC_FAILED";
+}
+
 export class WechatAgentService {
   private readonly feedReader: FeedReader;
   private readonly direct: DirectWechatConnector;
   private readonly articleDiscovery: typeof searchSogou;
+  private readonly feedUrlSecretKey: Uint8Array | undefined;
+  private readonly syncTails = new Map<string, Promise<void>>();
 
   constructor(
     readonly repository: WechatRepository,
-    options: { feedReader?: FeedReader; direct?: DirectWechatConnector; articleDiscovery?: typeof searchSogou } = {},
+    options: {
+      feedReader?: FeedReader;
+      direct?: DirectWechatConnector;
+      articleDiscovery?: typeof searchSogou;
+      feedUrlSecretKey?: Uint8Array;
+    } = {},
   ) {
     this.feedReader = options.feedReader ?? new DefaultFeedReader();
     this.direct = options.direct ?? new DirectWechatConnector(new DefaultWechatFetcher(), new DefaultWechatParser());
     this.articleDiscovery = options.articleDiscovery ?? searchSogou;
+    this.feedUrlSecretKey = options.feedUrlSecretKey;
+  }
+
+  private async searchLocalArticles(
+    text: string | undefined,
+    options: ArticleSearchOptions,
+    limit: number,
+  ): Promise<ArticleSearchResult[]> {
+    if (!options.accountName) {
+      return this.repository.articles.searchArticles({
+        ...(text ? { text } : {}),
+        ...(options.publishedAfter ? { publishedAfter: options.publishedAfter } : {}),
+        ...(options.publishedBefore ? { publishedBefore: options.publishedBefore } : {}),
+        limit,
+      });
+    }
+    const matches: ArticleSearchResult[] = [];
+    const pageSize = 200;
+    for (let offset = 0; matches.length < limit; offset += pageSize) {
+      const page = await this.repository.articles.searchArticles({
+        ...(text ? { text } : {}),
+        ...(options.publishedAfter ? { publishedAfter: options.publishedAfter } : {}),
+        ...(options.publishedBefore ? { publishedBefore: options.publishedBefore } : {}),
+        limit: pageSize,
+        offset,
+      });
+      matches.push(...page.filter((result) => matchesArticleFilters(result, options)));
+      if (page.length < pageSize) break;
+    }
+    return matches.slice(0, limit);
   }
 
   async queryArticles(query: string, options: ArticleSearchOptions = {}): Promise<ArticleSearchResponse> {
     const scope = options.scope ?? "hybrid";
     const limit = Math.max(1, Math.min(options.limit ?? 10, 100));
-    const localLimit = options.accountName ? Math.min(200, Math.max(limit * 10, 50)) : limit;
     const remoteLimit = options.accountName ? Math.min(100, Math.max(limit * 5, 20)) : limit;
     const text = query.trim() || undefined;
     const remoteQuery = [options.accountName, text].filter(Boolean).join(" ");
     const [local, remoteOutcome] = await Promise.all([
       scope === "global"
         ? Promise.resolve([] as ArticleSearchResult[])
-        : this.repository.articles.searchArticles({
-            ...(text ? { text } : {}),
-            ...(options.publishedAfter ? { publishedAfter: options.publishedAfter } : {}),
-            ...(options.publishedBefore ? { publishedBefore: options.publishedBefore } : {}),
-            limit: localLimit,
-          }),
+        : this.searchLocalArticles(text, options, limit),
       scope === "local"
         ? Promise.resolve({ results: [] as Awaited<ReturnType<typeof searchSogou>>, error: undefined })
         : this.articleDiscovery(remoteQuery, remoteLimit)
@@ -106,21 +225,9 @@ export class WechatAgentService {
     const filteredRemote = remote
       .map((result) => ({ article: result.article, sources: [result.source] }))
       .filter((result) => matchesArticleFilters(result, options));
-    const merged = new Map(filteredLocal.map((result) => [result.article.id, result]));
-    for (const result of filteredRemote) {
-      const existing = merged.get(result.article.id);
-      if (!existing) {
-        merged.set(result.article.id, result);
-        continue;
-      }
-      const sources = new Map([...existing.sources, ...result.sources].map((source) => [source.id, source]));
-      merged.set(result.article.id, {
-        article: existing.article,
-        sources: [...sources.values()],
-      });
-    }
-    for (const result of merged.values()) await storeResult(this.repository, result);
-    const results = [...merged.values()]
+    const merged = mergeSearchCandidates([...filteredLocal, ...filteredRemote]);
+    for (const result of merged) await storeResult(this.repository, result);
+    const results = merged
       .sort((a, b) => (b.article.publishedAt ?? "").localeCompare(a.article.publishedAt ?? ""))
       .slice(0, limit);
     const warnings = remoteOutcome.error
@@ -193,19 +300,29 @@ export class WechatAgentService {
   }
 
   async subscribeFeed(feedUrl: string, label?: string): Promise<Subscription> {
-    const format = await detectFeedFormat(feedUrl, this.feedReader);
+    const protectedUrl = protectFeedUrl(feedUrl, this.feedUrlSecretKey);
+    const format = await detectFeedFormat(protectedUrl.normalizedUrl, this.feedReader);
     const now = new Date().toISOString();
+    const id = createStableId("subscription", protectedUrl.identityUrl);
+    const existing = await this.repository.subscriptions.getSubscription(id);
     const item: Subscription = {
-      id: createStableId("subscription", feedUrl),
-      connectorId: `feed:${format}`,
-      sourceUrl: new URL(feedUrl).href,
-      state: "active",
-      createdAt: now,
+      ...existing,
+      id,
+      connectorId: `feed:${format}:${createStableId("feed", id).slice(-12)}`,
+      sourceUrl: protectedUrl.publicUrl,
+      state: existing?.state ?? "active",
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now,
-      metadata: { format, label: label ?? null },
-      ...(label ? { label } : {}),
+      metadata: {
+        ...existing?.metadata,
+        format,
+        ...feedUrlMetadata(protectedUrl.encryptedUrl),
+        ...(label !== undefined ? { label: label || null } : {}),
+      },
+      ...(label !== undefined ? (label ? { label } : {}) : existing?.label ? { label: existing.label } : {}),
     };
-    return this.repository.subscriptions.upsertSubscription(item);
+    if (label !== undefined && !label) delete item.label;
+    return redactSubscription(await this.repository.subscriptions.upsertSubscription(item));
   }
 
   async unsubscribe(subscriptionId: string): Promise<boolean> {
@@ -213,7 +330,7 @@ export class WechatAgentService {
   }
 
   async listSubscriptions(): Promise<Subscription[]> {
-    return this.repository.subscriptions.listSubscriptions();
+    return (await this.repository.subscriptions.listSubscriptions()).map(redactSubscription);
   }
 
   async sync(subscriptionId?: string) {
@@ -222,18 +339,56 @@ export class WechatAgentService {
       : await this.repository.subscriptions.listSubscriptions({ activeOnly: true });
     if (subscriptionId && subscriptions.length === 0) throw new Error(`Subscription not found: ${subscriptionId}`);
     const results: SyncRun[] = [];
-    for (const subscription of subscriptions) results.push(await this.syncOne(subscription));
+    for (const subscription of subscriptions) {
+      results.push(await this.withSubscriptionLock(subscription.id, async () => {
+        const current = await this.repository.subscriptions.getSubscription(subscription.id);
+        if (!current) throw new Error(`Subscription not found: ${subscription.id}`);
+        return this.syncOne(current);
+      }));
+    }
+    const failed = results.filter((run) => run.status === "failed" || run.status === "needs-user-action");
+    if (failed.length > 0) {
+      const partial = failed.length < results.length;
+      const targeted = subscriptionId !== undefined;
+      throw new ConnectorError(
+        targeted
+          ? failed[0]?.errorCode ?? "SYNC_FAILED"
+          : partial ? "PARTIAL_SYNC_FAILED" : "SYNC_ALL_FAILED",
+        targeted
+          ? failed[0]?.errorMessage ?? "Synchronization failed"
+          : partial
+          ? `Synchronization partially failed for ${failed.length} of ${results.length} subscriptions`
+          : `Synchronization failed for all ${results.length} subscriptions`,
+        {
+          retryable: failed.some((run) => retryableSyncCode(run.errorCode)),
+          needsUserAction: failed.some((run) => run.status === "needs-user-action"),
+        },
+      );
+    }
     return results;
   }
 
+  private async withSubscriptionLock<T>(subscriptionId: string, work: () => Promise<T>): Promise<T> {
+    const previous = this.syncTails.get(subscriptionId) ?? Promise.resolve();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.then(() => gate);
+    this.syncTails.set(subscriptionId, tail);
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+      if (this.syncTails.get(subscriptionId) === tail) this.syncTails.delete(subscriptionId);
+    }
+  }
+
   private async syncOne(subscription: Subscription): Promise<SyncRun> {
-    if (!subscription.sourceUrl) throw new Error(`Subscription ${subscription.id} has no feed URL`);
-    const format = String(subscription.metadata?.format ?? subscription.connectorId.split(":")[1]) as FeedFormat;
-    const connector = new FeedConnector(subscription.sourceUrl, format, this.feedReader, { id: subscription.connectorId });
+    const connectorId = subscription.connectorId;
     const startedAt = new Date().toISOString();
     let run: SyncRun = {
       id: randomUUID(),
-      connectorId: subscription.connectorId,
+      connectorId,
       subscriptionId: subscription.id,
       status: "running",
       startedAt,
@@ -243,14 +398,19 @@ export class WechatAgentService {
     };
     await this.repository.sync.upsertSyncRun(run);
     try {
-      const page = await connector.listArticles({ sourceUrl: subscription.sourceUrl, limit: 100, ...(subscription.cursor ? { cursor: subscription.cursor } : {}) }, { now: () => new Date() });
+      const sourceUrl = revealFeedUrl(subscription, this.feedUrlSecretKey);
+      if (!sourceUrl) throw new ConnectorError("INVALID_INPUT", `Subscription ${subscription.id} has no feed URL`);
+      const format = String(subscription.metadata?.format ?? subscription.connectorId.split(":")[1]) as FeedFormat;
+      const connector = new FeedConnector(sourceUrl, format, this.feedReader, { id: connectorId });
+      const page = await connector.listArticles({ sourceUrl, limit: 100, ...(subscription.cursor ? { cursor: subscription.cursor } : {}) }, { now: () => new Date() });
       let stored = 0;
       for (const item of page.items) {
         const existing = await this.repository.articles.getArticle(item.article.id);
         const subscriptionAccount = subscription.label?.trim();
-        const article = subscriptionAccount
+        const incomingArticle = subscriptionAccount
           ? { ...item.article, metadata: { ...item.article.metadata, accountName: subscriptionAccount } }
           : item.article;
+        const article = existing ? mergeArticle(existing, incomingArticle) : incomingArticle;
         const source = subscriptionAccount
           ? { ...item.source, metadata: { ...item.source.metadata, accountName: subscriptionAccount } }
           : item.source;
@@ -266,14 +426,22 @@ export class WechatAgentService {
         articlesDiscovered: page.items.length,
         articlesStored: stored,
       };
-      await this.repository.subscriptions.upsertSubscription({
-        ...subscription,
-        ...(page.nextCursor ? { cursor: page.nextCursor } : {}),
-        lastSyncedAt: completedAt,
-        updatedAt: completedAt,
+      await this.repository.transaction(async (repositories) => {
+        const current = await repositories.subscriptions.getSubscription(subscription.id);
+        if (!current || current.cursor !== subscription.cursor) {
+          throw new ConnectorError("STALE_CURSOR", `Subscription ${subscription.id} changed during synchronization`, {
+            retryable: true,
+          });
+        }
+        await repositories.subscriptions.upsertSubscription({
+          ...current,
+          ...(page.nextCursor ? { cursor: page.nextCursor } : {}),
+          lastSyncedAt: completedAt,
+          updatedAt: completedAt,
+        });
       });
       await this.repository.sync.setSourceHealth({
-        connectorId: subscription.connectorId,
+        connectorId,
         state: "healthy",
         checkedAt: completedAt,
         consecutiveFailures: 0,
@@ -288,9 +456,9 @@ export class WechatAgentService {
         errorCode: connectorError?.code ?? "SYNC_FAILED",
         errorMessage: error instanceof Error ? error.message : String(error),
       };
-      const previous = await this.repository.sync.getSourceHealth(subscription.connectorId);
+      const previous = await this.repository.sync.getSourceHealth(connectorId);
       const health: SourceHealth = {
-        connectorId: subscription.connectorId,
+        connectorId,
         state: connectorError?.needsUserAction ? "needs-user-action" : "degraded",
         checkedAt: completedAt,
         consecutiveFailures: (previous?.consecutiveFailures ?? 0) + 1,
@@ -312,7 +480,7 @@ export class WechatAgentService {
     return {
       databasePath,
       scheduler: { enabled: false, detail: "Synchronization runs only when `wechat-agent sync` is called." },
-      subscriptions,
+      subscriptions: subscriptions.map(redactSubscription),
       sourceHealth: health,
       recentSyncRuns: recentRuns,
     };
@@ -321,12 +489,13 @@ export class WechatAgentService {
 
 export async function openRuntime(dataRoot = appDataDir()): Promise<RuntimeHandle> {
   await mkdir(dataRoot, { recursive: true, mode: 0o700 });
+  const feedUrlSecretKey = await loadFeedUrlSecretKey(dataRoot);
   const databasePath = join(dataRoot, "wechat-agent.sqlite");
   const adapter = new NodeSqliteAdapter(databasePath);
   const repository = new SqliteRepository(adapter);
   await repository.initialize();
   return {
-    service: new WechatAgentService(repository),
+    service: new WechatAgentService(repository, { feedUrlSecretKey }),
     databasePath,
     close: () => adapter.close(),
   };

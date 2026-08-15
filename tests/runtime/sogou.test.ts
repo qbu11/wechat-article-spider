@@ -43,6 +43,16 @@ describe("parseSogouResults", () => {
     expect(yesterday.article.id).toBe(today.article.id);
     expect(yesterday.article.metadata?.publicationHint).toBeUndefined();
   });
+
+  it("rejects result links outside Sogou and direct WeChat article hosts", () => {
+    const html = `<ul class="news-list"><li><div class="txt-box"><h3><a href="https://evil.example/phish">Fake</a></h3></div></li></ul>`;
+    expect(parseSogouResults(html)).toEqual([]);
+  });
+
+  it("rejects result links with embedded credentials", () => {
+    const html = `<ul class="news-list"><li><div class="txt-box"><h3><a href="https://user:TOPSECRET@mp.weixin.qq.com/s/example">Fake</a></h3></div></li></ul>`;
+    expect(parseSogouResults(html)).toEqual([]);
+  });
 });
 
 afterEach(() => {
